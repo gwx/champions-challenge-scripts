@@ -1,0 +1,69 @@
+bool Dir_Valid(int dir) {
+	return 0 <= dir && dir <= 7;}
+
+int Dir_X(int dir) {
+  if (dir < 2) {return 0;}
+  else if (dir % 2 == 0) {return -1;}
+  else {return 1;}}
+
+int Dir_Y(int dir) {
+  if (dir == DIR_UP) {return -1;}
+  else if (dir == DIR_DOWN) {return 1;}
+  else if (dir > 3) {
+    if (dir & 2) {return 1;}
+    else {return -1;}}
+  else {
+    return 0;}}
+
+// Get the angle for a direction.
+int Dir_Angle(int dir) {
+	if (DIR_UP == dir) {return -90;}
+	if (DIR_DOWN == dir) {return 90;}
+	if (DIR_LEFT == dir) {return 180;}
+	if (DIR_RIGHT == dir) {return 0;}
+	if (DIR_RIGHTUP == dir) {return -45;}
+	if (DIR_LEFTUP == dir) {return -135;}
+	if (DIR_RIGHTDOWN == dir) {return 45;}
+	if (DIR_LEFTDOWN == dir) {return 135;}}
+
+// Get the major direction.
+int Dir_Major(int dx, int dy) {
+	int adx = Abs(dx);
+	int ady = Abs(dy);
+	if (adx >= ady) {
+		if (dx > 0) {return DIR_RIGHT;}
+		else if (dx < 0) {return DIR_LEFT;}
+		else {return -1;}}
+	else {
+		if (dy > 0) {return DIR_DOWN;}
+		else {return DIR_UP;}}}
+
+// Get the minor direction.
+int Dir_Minor(int dx, int dy) {
+	int adx = Abs(dx);
+	int ady = Abs(dy);
+	if (adx < ady) {
+		if (dx > 0) {return DIR_RIGHT;}
+		else if (dx < 0) {return DIR_LEFT;}
+		else {return -1;}}
+	else {
+		if (dy > 0) {return DIR_DOWN;}
+		else {return DIR_UP;}}}
+
+// Get the next cardinal clockwise direction.
+int Dir_ClockwiseCardinal(int dir) {
+	if (dir == DIR_UP) {return DIR_RIGHT;}
+	if (dir == DIR_RIGHT) {return DIR_DOWN;}
+	if (dir == DIR_DOWN) {return DIR_LEFT;}
+	if (dir == DIR_LEFT) {return DIR_UP;}}
+
+// Get the next cardinal counter-clockwise direction.
+int Dir_CounterCardinal(int dir) {
+	if (dir == DIR_UP) {return DIR_LEFT;}
+	if (dir == DIR_RIGHT) {return DIR_UP;}
+	if (dir == DIR_DOWN) {return DIR_RIGHT;}
+	if (dir == DIR_LEFT) {return DIR_DOWN;}}
+
+// Get the degrees of a dir.
+int Dir_Degrees(int dir) {
+	return Angle(0, 0, Dir_X(dir), Dir_Y(dir));}

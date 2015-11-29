@@ -1,0 +1,3 @@
+item script heart {
+	void run() {
+		Link_ResourceAdd(RES_LIFE, RES_DIVISOR);}}

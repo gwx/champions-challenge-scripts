@@ -1,0 +1,118 @@
+// Misc index for the EWEAPON's consistent id.
+const int EWEAPON_MISC_ID = 0;
+
+const int EWEAPON_DATA_COUNT = 32;
+const int EWEAPON_DATA_SIZE = 1;
+int EWeapon_Data[32];
+
+// The eweapon's index on the screen. Updated when necessary in EWeapon_Index().
+const int EWEAPON_SCREEN_INDEX = 0;
+
+// If the eweapons have been indexed this frame.
+bool EWeapon_Indexed = false;
+
+////////////////////////////////////////////////////////////////
+// Basic Accessors
+
+int EWeapon_Val(int id, int index) {
+	return EWeapon_Data[id * EWEAPON_DATA_SIZE + index];}
+
+void EWeapon_Val(int id, int index, int value) {
+	EWeapon_Data[id * EWEAPON_DATA_SIZE + index] = value;}
+
+bool EWeapon_Flag(int id, int index, int key) {
+	return EWeapon_Val(id, index) & key;}
+
+void EWeapon_Flag(int id, int index, int key, bool value) {
+	int flagset = EWeapon_Val(id, index);
+	if (value) {
+		flagset |= key;}
+	else {
+		flagset &= ~key;}
+	EWeapon_Val(id, index, flagset);}
+
+// Get the eweapon's id, or -1 if it doesn't have one.
+int EWeapon_Id(eweapon o) {return o->Misc[EWEAPON_MISC_ID] - 1;}
+
+////////////////////////////////////////////////////////////////
+// Assignment & Indexing
+
+// Gives an unused id to an eweapon.
+// o - the eweapon
+// index - the eweapon's screen index
+int EWeapon_LastId = -1;
+int EWeapon_AssignId(int index) {
+	return EWeapon_AssignId(Screen->LoadEWeapon(index), index);}
+int EWeapon_AssignId(eweapon o) {
+	// Find the screen index.
+	for (int i = 1; i <= Screen->NumEWeapons(); ++i) {
+		eweapon o2 = Screen->LoadEWeapon(i);
+		if (o2 == o) {
+			return EWeapon_AssignId(o, i);}}
+	int a[]="ERROR: EWeapon has no screen index!"; TraceS(a); TraceNL();
+	return -1;}
+int EWeapon_AssignId(eweapon o, int index) {
+	int id = (EWeapon_LastId + 1) % EWEAPON_DATA_COUNT;
+	while (id != EWeapon_LastId) {
+		if (0 == EWeapon_Val(id, EWEAPON_SCREEN_INDEX)) {
+			EWeapon_LastId = id;
+			Array_Fill(EWeapon_Data, 0, id * EWEAPON_DATA_SIZE, (id + 1) * EWEAPON_DATA_SIZE);
+			EWeapon_Val(id, EWEAPON_SCREEN_INDEX, index);
+			o->Misc[EWEAPON_MISC_ID] = id + 1;
+			return id;}
+		id = (id + 1) % EWEAPON_DATA_COUNT;}
+
+	int a[]="ERROR: Out of eweapon slots. Suspected memory leak."; TraceS(a); TraceNL();
+	return -1;}
+
+void EWeapon_Index() {
+	// Clear all screen indices.
+	for (int id = 0; id < EWEAPON_DATA_COUNT; ++id) {
+		EWeapon_Val(id, EWEAPON_SCREEN_INDEX, 0);}
+
+	// Assign screen indices for this frame. Also registers new eweapons.
+	for (int index = 1; index <= Screen->NumEWeapons(); ++index) {
+		eweapon o = Screen->LoadEWeapon(index);
+		int id = EWeapon_Id(o);
+		// If the eweapon is unassigned, give it an id.
+		if (-1 == id) {id = EWeapon_AssignId(o, index);}
+		// Save the screen index.
+		EWeapon_Val(id, EWEAPON_SCREEN_INDEX, index);}
+
+	EWeapon_Indexed = true;}
+
+////////////////////////////////////////////////////////////////
+// Active Script Calls
+
+void EWeapon_Post() {EWeapon_Indexed = false;}
+
+////////////////////////////////////////////////////////////////
+// Actual Use
+
+// Creates a new eweapon and indexes it immediately.
+eweapon EWeapon_Create(int type) {
+	eweapon o = Screen->CreateEWeapon(type);
+	EWeapon_AssignId(o);
+	return o;}
+
+// Gets the eweapon with the given id.
+eweapon EWeapon_Get(int id) {
+	if (!EWeapon_Indexed) {EWeapon_Index();}
+	int index = EWeapon_Val(id, EWEAPON_SCREEN_INDEX);
+	if (0 == index) {
+		int a[]="ERROR: No screen index for eweapon id "; TraceS(a); Trace(id);}
+	return Screen->LoadEWeapon(index);}
+
+// If the npc with the given id exists.
+bool EWeapon_Exists(int id) {
+	if (!EWeapon_Indexed) {EWeapon_Index();}
+	int index = EWeapon_Val(id, EWEAPON_SCREEN_INDEX);
+	if (0 == index) {return false;}
+	eweapon o = Screen->LoadEWeapon(index);
+	return o->isValid();}
+
+// Removes the eweapon from the screen.
+void EWeapon_Destroy(int id) {EWeapon_Destroy(EWeapon_Get(id));}
+void EWeapon_Destroy(eweapon o) {
+	o->X = -100;
+	o->DeadState = WDS_DEAD;}

@@ -1,0 +1,223 @@
+// Custom state id for shooting.
+const int ENEMY_OCTOROK_STATE_ATTACK = 100;
+
+// State indices.
+const int ENEMY_OCTOROK_ATTACK_PHASE = 9;
+const int ENEMY_OCTOROK_ATTACK_TIMER = 10;
+
+//// Attack state phases.
+// Phase for the initial start delay.
+const int ENEMY_OCTOROK_ATTACK_PHASE_START = 1;
+// Phase for the shot being shot.
+const int ENEMY_OCTOROK_ATTACK_PHASE_FIRING = 2;
+// Phase for the end delay.
+const int ENEMY_OCTOROK_ATTACK_PHASE_END = 3;
+
+// Tile foffsets for the different actions.
+const int ENEMY_OCTOROK_TILE_STAND = 0;
+const int ENEMY_OCTOROK_TILE_WALK = 20;
+const int ENEMY_OCTOROK_TILE_SHOT = 40;
+
+// How long to pursue link without seeing him.
+const int ENEMY_OCTOROK_PURSUE_DURATION = 240;
+// How close to being axis aligned with the target before attacking.
+const int ENEMY_OCTOROK_ALIGN_MIN = 4;
+const int ENEMY_OCTOROK_ALIGN_MAX = 8;
+// How close link can get before you run away.
+const int ENEMY_OCTOROK_RUN_MIN = 24;
+const int ENEMY_OCTOROK_RUN_MAX = 48;
+// Number of frames it takes before shooting.
+const int ENEMY_OCTOROK_CHARGE_MIN = 12;
+const int ENEMY_OCTOROK_CHARGE_MAX = 18;
+// Number of frames the attacking animation lasts.
+const int ENEMY_OCTOROK_ATTACK_DURATION = 4;
+// How long before we can move again after firing.
+const int ENEMY_OCTOROK_RECOVER_MIN = 20;
+const int ENEMY_OCTOROK_RECOVER_MAX = 50;
+// Sound for attacking
+const int ENEMY_OCTOROK_ATTACK_SOUND = 42;
+
+ffc script ai_octorok {
+	void run() {
+		int enemy_id = this->InitD[ENEMY_FFCD_ID];
+		int npc_id = Enemy_NpcId(enemy_id);
+		if (-1 == npc_id) {return;}
+
+		npc o = Npc_Get(npc_id);
+		int base_tile = o->OriginalTile;
+
+		// Give default defenses.
+		int damage_id = Enemy_Defense(enemy_id);
+		Damage_Fill(damage_id, 3);
+		Damage_Val(damage_id, DAMAGE_CRUSH, 11);
+
+		// Give default attack.
+		damage_id = Enemy_Attack(enemy_id);
+		Damage_Val(damage_id, DAMAGE_KNOCKBACK, 10);
+		Damage_Val(damage_id, DAMAGE_CRUSH, 8);
+
+		// Setup detection.
+		Enemy_Sight(enemy_id, 210);
+		Enemy_SenseLink(enemy_id);
+
+		// wander data array.
+		int wander[3];
+		// Track the walking animation.
+		int walk_timer = 0;
+
+		// Randomize the various values so enemies don't clump as much.
+		int align_distance = Rand(
+				ENEMY_OCTOROK_ALIGN_MIN,
+				ENEMY_OCTOROK_ALIGN_MAX);
+		int run_distance = Rand(
+				ENEMY_OCTOROK_RUN_MIN,
+				ENEMY_OCTOROK_RUN_MAX);
+		int charge_time = Rand(
+				ENEMY_OCTOROK_CHARGE_MIN,
+				ENEMY_OCTOROK_CHARGE_MAX);
+		int recover_time = Rand(
+				ENEMY_OCTOROK_RECOVER_MIN,
+				ENEMY_OCTOROK_RECOVER_MAX);
+
+		while (true) {
+			if (DEBUG_ENEMY == Debug_Mode) {
+				int a[]="[Octorok] Enemy Id: "; TraceS(a); Trace(enemy_id);
+				int b[]="  State: "; TraceS(b); Trace(Enemy_State(enemy_id));}
+
+			if (!Enemy_IsAlloc(enemy_id)) {return;}
+
+			if (!Npc_Exists(npc_id)) {
+				Enemy_Free(enemy_id);
+				return;}
+
+			o = Npc_Get(npc_id);
+			int tile = base_tile;
+			tile += o->Dir;
+			int tile_offset = ENEMY_OCTOROK_TILE_STAND;
+
+			int state = Enemy_State(enemy_id);
+
+			// Standard walking around.
+			if (ENEMY_STATE_NONE == state) {
+				// Walking animation.
+				walk_timer = (walk_timer + 1) % 24;
+				if (walk_timer >= 12) {tile_offset = ENEMY_OCTOROK_TILE_WALK;}
+
+				int time = Enemy_LinkTime(enemy_id);
+				// If we don't see link, then wander.
+				if (-1 == time || time > ENEMY_OCTOROK_PURSUE_DURATION) {
+					Enemy_Wander(enemy_id, wander);}
+
+				// We can see link.
+				else {
+					int ex = Enemy_CenterX(enemy_id);
+					int ey = Enemy_CenterY(enemy_id);
+					int lx = Enemy_LinkX(enemy_id);
+					int ly = Enemy_LinkX(enemy_id);
+					int dx = lx - ex;
+					int dy = ly - ey;
+					int dir = Dir_Major(dx, dy);
+					int distance = Sqrt(dx*dx + dy*dy);
+
+					// If link is not directly seen, investigate.
+					if (0 != time) {
+						int dist = Enemy_Walk(enemy_id, lx, ly);
+						// If we can't for some reason, we've lost sight of link.
+						if (0 == dist) {
+							Enemy_LinkTime(enemy_id, -1);}}
+
+					// If link is directly in sight, and too close, run away.
+					else if (distance < run_distance) {
+						int dist = Enemy_Walk(enemy_id, ex - dx, ey - dy);
+						// If we can't flee, turn to shoot instead.
+						if (0 == dist) {
+							o->Dir = dir;
+							Enemy_State(enemy_id, ENEMY_OCTOROK_STATE_ATTACK);
+							Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_PHASE, ENEMY_OCTOROK_ATTACK_PHASE_START);
+							Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_TIMER, charge_time);}}
+
+					// If link is seen and far enough away, try to line up for a shot.
+					else if (Min(Abs(dx), Abs(dy)) > align_distance) {
+						// Give a tiny bit of movement towards the target, but mostly
+						// moving towards alignment.
+						int x = lx;
+						int y = ly;
+						if (Abs(dx) < Abs(dy)) {
+							y = ly * 0.1 + ey * 0.9;}
+						else {
+							x = lx * 0.1 + ex * 0.9;}
+						int dist = Enemy_Walk(enemy_id, x, y);
+						// If alignment fails, move directly to shooting.
+						if (0 == dist) {
+							o->Dir = dir;
+							Enemy_State(enemy_id, ENEMY_OCTOROK_STATE_ATTACK);
+							Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_PHASE, ENEMY_OCTOROK_ATTACK_PHASE_START);
+							Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_TIMER, charge_time);}}
+
+					// We're aligned, so shoot.
+					else {
+						o->Dir = dir;
+						Enemy_State(enemy_id, ENEMY_OCTOROK_STATE_ATTACK);
+						Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_PHASE, ENEMY_OCTOROK_ATTACK_PHASE_START);
+						Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_TIMER, charge_time);}}}
+
+			// Attacking
+			else if (ENEMY_OCTOROK_STATE_ATTACK == state) {
+				int phase = Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_PHASE);
+				int timer = Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_TIMER);
+
+				--timer;
+
+				if (ENEMY_OCTOROK_ATTACK_PHASE_START == phase) {
+					if (timer <= 0) {
+						phase = ENEMY_OCTOROK_ATTACK_PHASE_FIRING;
+						timer = ENEMY_OCTOROK_ATTACK_DURATION;
+						Game->PlaySound(ENEMY_OCTOROK_ATTACK_SOUND);
+
+						eweapon weapon_object = Weapon_CreateEW();
+						int weapon_id = Weapon_Id(weapon_object);
+						int damage_id = Weapon_Damage(weapon_id);
+						Damage_Val(damage_id, DAMAGE_CRUSH, o->WeaponDamage);
+						Damage_Val(damage_id, DAMAGE_KNOCKBACK, 12);
+						weapon_object->Dir = o->Dir;
+						weapon_object->OriginalTile = base_tile + ENEMY_OCTOROK_TILE_SHOT;
+						weapon_object->NumFrames = 1;
+						weapon_object->HitXOffset = 0;
+						weapon_object->HitYOffset = 0;
+						weapon_object->HitWidth = 8;
+						weapon_object->HitHeight = 8;
+						weapon_object->Step = 200;
+						if (DIR_UP == o->Dir) {
+							weapon_object->X = o->X + 4;
+							weapon_object->Y = o->Y;}
+						else if (DIR_DOWN == o->Dir) {
+							weapon_object->X = o->X + 4;
+							weapon_object->Y = o->Y + 16;}
+						else if (DIR_LEFT == o->Dir) {
+							weapon_object->X = o->X - 6;
+							weapon_object->Y = o->Y + 6;}
+						else if (DIR_RIGHT == o->Dir) {
+							weapon_object->X = o->X + 14;
+							weapon_object->Y = o->Y + 6;}
+						Collision_Adjust(weapon_object);
+
+						o->DrawXOffset = Dir_X(o->Dir) * -2;
+						o->DrawYOffset = Dir_Y(o->Dir) * -2;}}
+
+				if (ENEMY_OCTOROK_ATTACK_PHASE_FIRING == phase && timer <= 0) {
+					o->DrawXOffset = 0;
+					o->DrawYOffset = 0;
+					phase = ENEMY_OCTOROK_ATTACK_PHASE_END;
+					timer = recover_time;}
+
+				if (ENEMY_OCTOROK_ATTACK_PHASE_END == phase && timer <= 0) {
+					Enemy_State(enemy_id, ENEMY_STATE_NONE);
+					phase = 0;
+					timer = 0;}
+
+				// Write back phase and timer.
+				Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_PHASE, phase);
+				Enemy_Val(enemy_id, ENEMY_OCTOROK_ATTACK_TIMER, timer);}
+
+			o->OriginalTile = tile + tile_offset;
+			Waitframe();}}}

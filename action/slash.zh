@@ -1,0 +1,291 @@
+// Action type id.
+const int ACTION_SLASH = 2;
+
+//// Argument Indices
+// Index for the slash startign tile.
+const int ACTION_SLASH_TILE = 3;
+// Index for the slash sound to play.
+const int ACTION_SLASH_SOUND = 4;
+// Index for the damage done.
+const int ACTION_SLASH_DAMAGE = 5;
+// Index for the slash's startup delay.
+const int ACTION_SLASH_DURATION_START_DELAY = 7;
+// Index for the duration of the first slash step.
+const int ACTION_SLASH_DURATION_SLASH_1 = 8;
+// Index for the duration of the second slash step.
+const int ACTION_SLASH_DURATION_SLASH_2 = 9;
+// Index for the duration of the third slash step.
+const int ACTION_SLASH_DURATION_SLASH_3 = 10;
+// Index for the slash's ending delay.
+const int ACTION_SLASH_DURATION_END_DELAY = 11;
+// Index for the resource type used.
+const int ACTION_SLASH_RESOURCE = 12;
+// Index for the resource amount used.
+const int ACTION_SLASH_RESOURCE_COST = 13;
+
+//// Variable Indices
+// Index for the current slash phase.
+const int ACTION_SLASH_PHASE = 14;
+// Index for the time left in this phase.
+const int ACTION_SLASH_TIMER = 15;
+// Index for the id for the slash weapon object.
+const int ACTION_SLASH_WEAPON_ID = 16;
+
+//// Phases
+// Default phase.
+const int ACTION_SLASH_PHASE_INIT = 0;
+// Startup delay phase.
+const int ACTION_SLASH_PHASE_START_DELAY = 1;
+// The first slash step.
+const int ACTION_SLASH_PHASE_SLASH_1 = 2;
+// The second slash step.
+const int ACTION_SLASH_PHASE_SLASH_2 = 3;
+// The third slash step.
+const int ACTION_SLASH_PHASE_SLASH_3 = 4;
+// Slash end delay phase.
+const int ACTION_SLASH_PHASE_END_DELAY = 5;
+
+// If the given slash action is possible.
+bool Action_Slash_Possible(int id) {
+	int res = Action_Val(id, ACTION_SLASH_RESOURCE);
+	if (RES_NONE != res) {
+		int cost = Action_Val(id, ACTION_SLASH_RESOURCE_COST);
+		if (Link_CurResource[res] < cost) {
+			return false;}}
+	return !Link_NoAct();}
+
+// Updates the slash.
+void Action_Slash(int id) {
+	Link_NoMove(true);
+	Link_NoAct(true);
+	Link_Acted(true);
+	if (LA_NONE == Link_Action
+			|| LA_WALKING == Link_Action) {
+		Link_Action = LA_CUSTOM;}
+
+	// Read variables.
+	int timer = Action_Val(id, ACTION_SLASH_TIMER);
+	int phase = Action_Val(id, ACTION_SLASH_PHASE);
+
+	if (timer > 0) {--timer;}
+
+	if (DEBUG_ACTION == Debug_Mode) {
+		int a[]="  Type: Slash"; TraceS(a); TraceNL();
+		int b[]="  Phase: "; TraceS(b); Trace(phase);
+		int c[]="  Timer: "; TraceS(c); Trace(timer);}
+
+	// Setup
+	if (ACTION_SLASH_PHASE_INIT == phase) {
+		Link_ResourceAdd(
+				Action_Val(id, ACTION_SLASH_RESOURCE),
+				-Action_Val(id, ACTION_SLASH_RESOURCE_COST));
+
+		phase = ACTION_SLASH_PHASE_START_DELAY;
+		timer = Action_Val(id, ACTION_SLASH_DURATION_START_DELAY);
+		if (LINK_TILE_STAND != Link_TileOffset
+				&& LINK_TILE_WALK != Link_TileOffset) {
+			Link_TileOffset = LINK_TILE_STAND;}}
+
+	// Initial Delay
+	if (ACTION_SLASH_PHASE_START_DELAY == phase && timer <= 0) {
+		phase = ACTION_SLASH_PHASE_SLASH_1;
+		timer = Action_Val(id, ACTION_SLASH_DURATION_SLASH_1);
+
+		if (DEBUG_ACTION == Debug_Mode) {
+			int a[]="  Creating Weapon:"; TraceS(a); TraceNL();}
+
+		Game->PlaySound(Action_Val(id, ACTION_SLASH_SOUND));
+		Link_TileOffset = LINK_TILE_SWING;
+		lweapon o = Weapon_CreateLW();
+		int weapon_id = Weapon_Id(o);
+
+		if (DEBUG_ACTION == Debug_Mode) {
+			int a[]="    Weapon Id: "; TraceS(a); Trace(weapon_id);}
+
+		Action_Val(id, ACTION_SLASH_WEAPON_ID, weapon_id);
+		Weapon_Damage(weapon_id, Action_Val(id, ACTION_SLASH_DAMAGE));
+		//Weapon_Flag(weapon_id, WEAPON_F1, WEAPON_F1_DIE, true);
+		o->OriginalTile = Action_Val(id, ACTION_SLASH_TILE) + Link->Dir * 3;
+		o->NumFrames = 1;
+		o->HitWidth = 14;
+		o->HitHeight = 14;
+		Collision_Adjust(o);
+		if (DIR_UP == Link->Dir) {
+			o->Dir = DIR_RIGHTUP;
+			o->DrawXOffset = -2;
+			o->DrawYOffset = 0;}
+		else if (DIR_DOWN == Link->Dir) {
+			o->Dir = DIR_LEFTDOWN;
+			o->DrawYOffset = -2;}
+		else if (DIR_LEFT == Link->Dir) {
+			o->Dir = DIR_LEFTUP;
+			o->DrawYOffset = 0;}
+		else if (DIR_RIGHT == Link->Dir) {
+			o->Dir = DIR_RIGHTDOWN;
+			o->DrawXOffset = -2;
+			o->DrawYOffset = -2;}}
+
+	// Slash 1
+	if (ACTION_SLASH_PHASE_SLASH_1 == phase) {
+		int weapon_id = Action_Val(id, ACTION_SLASH_WEAPON_ID);
+
+		// Weapon disappeared for some reason? Go straight to the end delay.
+		if (!LWeapon_Exists(Weapon_ObjectId(weapon_id))) {
+			if (DEBUG_ACTION == Debug_Mode) {
+				int a[]="  Weapon Missing! Going to end phase."; TraceS(a); TraceNL();}
+			Weapon_Free(weapon_id);
+			Link_TileOffset = LINK_TILE_STAND;
+			phase = ACTION_SLASH_PHASE_END_DELAY;;
+			timer = Action_Val(id, ACTION_SLASH_DURATION_END_DELAY);}
+
+		else {
+			Link_TileOffset = LINK_TILE_SWING;
+			lweapon o = LWeapon_Get(Weapon_ObjectId(weapon_id));
+			o->DeadState = WDS_ALIVE; // Keep alive each frame.
+			// Move weapon to link's position.
+			if (timer > 0) {
+				if (DIR_UP == Link->Dir) {
+					o->X = Link->X + 4;
+					o->Y = Link->Y - 2;}
+				else if (DIR_DOWN == Link->Dir) {
+					o->X = Link->X - 2;
+					o->Y = Link->Y + 8;}
+				else if (DIR_LEFT == Link->Dir) {
+					o->X = Link->X - 4;
+					o->Y = Link->Y + 0;}
+				else if (DIR_RIGHT == Link->Dir) {
+					o->X = Link->X + 6;
+					o->Y = Link->Y + 6;}
+				o->Z = Link->Z;}
+
+			// Adjust hitbox and advance.
+			else {
+				if (DIR_UP == Link->Dir) {
+					o->HitWidth -= 6;
+					o->HitHeight += 6;
+					o->DrawXOffset = 0;}
+				else if (DIR_DOWN == Link->Dir) {
+					o->HitWidth -= 6;
+					o->HitHeight += 6;
+					o->DrawYOffset = 4;}
+				else if (DIR_LEFT == Link->Dir) {
+					o->HitWidth += 6;
+					o->HitHeight -= 6;}
+				else if (DIR_RIGHT == Link->Dir) {
+					o->HitWidth += 6;
+					o->HitHeight -= 6;
+					o->DrawXOffset = 4;
+					o->DrawYOffset = 0;}
+				o->Dir = Link->Dir;
+				++o->OriginalTile;
+
+				phase = ACTION_SLASH_PHASE_SLASH_2;
+				timer = Action_Val(id, ACTION_SLASH_DURATION_SLASH_2);}}}
+
+	// Slash 2
+	if (ACTION_SLASH_PHASE_SLASH_2 == phase) {
+		int weapon_id = Action_Val(id, ACTION_SLASH_WEAPON_ID);
+
+		// Weapon disappeared for some reason? Go straight to the end delay.
+		if (!LWeapon_Exists(Weapon_ObjectId(weapon_id))) {
+			if (DEBUG_ACTION == Debug_Mode) {
+				int a[]="  Weapon Missing! Going to end phase."; TraceS(a); TraceNL();}
+			Weapon_Free(weapon_id);
+			Link_TileOffset = LINK_TILE_STAND;
+			phase = ACTION_SLASH_PHASE_END_DELAY;;
+			timer = Action_Val(id, ACTION_SLASH_DURATION_END_DELAY);}
+
+		else {
+			Link_TileOffset = LINK_TILE_STAB;
+			lweapon o = LWeapon_Get(Weapon_ObjectId(weapon_id));
+			o->DeadState = WDS_ALIVE;
+
+			if (timer > 0) {
+				if (DIR_UP == Link->Dir) {
+					o->X = Link->X + 2;
+					o->Y = Link->Y - 7;}
+				else if (DIR_DOWN == Link->Dir) {
+					o->X = Link->X + 6;
+					o->Y = Link->Y + 9;}
+				else if (DIR_LEFT == Link->Dir) {
+					o->X = Link->X - 11;
+					o->Y = Link->Y + 8;}
+				else if (DIR_RIGHT == Link->Dir) {
+					o->X = Link->X + 7;
+					o->Y = Link->Y + 4;}
+				o->Z = Link->Z;}
+
+			else {
+				if (DIR_UP == Link->Dir) {
+					o->HitWidth += 6;
+					o->HitHeight -= 6;
+					o->Dir = DIR_LEFTUP;}
+				else if (DIR_DOWN == Link->Dir) {
+					o->HitWidth += 6;
+					o->HitHeight -= 6;
+					o->DrawXOffset = -2;
+					o->DrawYOffset = -2;
+					o->Dir = DIR_RIGHTDOWN;}
+				else if (DIR_LEFT == Link->Dir) {
+					o->HitWidth -= 6;
+					o->HitHeight += 6;
+					o->DrawYOffset = -2;
+					o->Dir = DIR_LEFTDOWN;}
+				else if (DIR_RIGHT == Link->Dir) {
+					o->HitWidth -= 6;
+					o->HitHeight += 6;
+					o->DrawXOffset = -2;
+					o->Dir = DIR_RIGHTUP;}
+				++o->OriginalTile;
+
+				phase = ACTION_SLASH_PHASE_SLASH_3;
+				timer = Action_Val(id, ACTION_SLASH_DURATION_SLASH_3);}}}
+
+	// Slash 3
+	if (ACTION_SLASH_PHASE_SLASH_3 == phase) {
+		int weapon_id = Action_Val(id, ACTION_SLASH_WEAPON_ID);
+
+		// Weapon disappeared for some reason? Go straight to the end delay.
+		if (!LWeapon_Exists(Weapon_ObjectId(weapon_id))) {
+			if (DEBUG_ACTION == Debug_Mode) {
+				int a[]="  Weapon Missing! Going to end phase."; TraceS(a); TraceNL();}
+			Weapon_Free(weapon_id);
+			Link_TileOffset = LINK_TILE_STAND;
+			phase = ACTION_SLASH_PHASE_END_DELAY;;
+			timer = Action_Val(id, ACTION_SLASH_DURATION_END_DELAY);}
+
+		else {
+			if (timer > 0) {
+				Link_TileOffset = LINK_TILE_STAB;
+				lweapon o = LWeapon_Get(Weapon_ObjectId(weapon_id));
+				o->DeadState = WDS_ALIVE;
+				if (DIR_UP == Link->Dir) {
+					o->X = Link->X - 6;
+					o->Y = Link->Y - 2;}
+				else if (DIR_DOWN == Link->Dir) {
+					o->X = Link->X + 8;
+					o->Y = Link->Y + 8;}
+				else if (DIR_LEFT == Link->Dir) {
+					o->X = Link->X - 4;
+					o->Y = Link->Y + 10;}
+				else if (DIR_RIGHT == Link->Dir) {
+					o->X = Link->X + 6;
+					o->Y = Link->Y - 4;}
+				o->Z = Link->Z;}
+
+			else {
+				if (DEBUG_ACTION == Debug_Mode || DEBUG_WEAPON == Debug_Mode) {
+					int a[]="  Destroying Weapon:"; TraceS(a); Trace(weapon_id);}
+				Link_TileOffset = LINK_TILE_STAND;
+				Weapon_Destroy(weapon_id);
+				phase = ACTION_SLASH_PHASE_END_DELAY;
+				timer = Action_Val(id, ACTION_SLASH_DURATION_END_DELAY);}}}
+
+	// End Delay.
+	if (ACTION_SLASH_PHASE_END_DELAY == phase && timer <= 0) {
+		phase = ACTION_SLASH_PHASE_INIT;
+		Action_Active(id, false);}
+
+	// Write variables.
+	Action_Val(id, ACTION_SLASH_TIMER, timer);
+	Action_Val(id, ACTION_SLASH_PHASE, phase);}

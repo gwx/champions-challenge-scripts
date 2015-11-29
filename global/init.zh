@@ -1,0 +1,8 @@
+global script Init {
+	void run() {
+		Enemy_Init();
+		Weapon_Init();
+		Link_Init();
+		// Hardcoding knight for now.
+		Class_KnightOn();
+	}}

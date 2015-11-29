@@ -1,0 +1,119 @@
+// Misc index for the NPC's consistent id.
+const int NPC_MISC_ID = 0;
+
+const int NPC_DATA_COUNT = 32;
+const int NPC_DATA_SIZE = 1;
+int Npc_Data[32];
+
+// The npc's index on the screen. Updated when necessary in Npc_Index().
+const int NPC_SCREEN_INDEX = 0;
+
+// If the npcs have been indexed this frame.
+bool Npc_Indexed = false;
+
+////////////////////////////////////////////////////////////////
+// Basic Accessors
+
+int Npc_Val(int id, int index) {
+	return Npc_Data[id * NPC_DATA_SIZE + index];}
+
+void Npc_Val(int id, int index, int value) {
+	Npc_Data[id * NPC_DATA_SIZE + index] = value;}
+
+bool Npc_Flag(int id, int index, int key) {
+	return Npc_Val(id, index) & key;}
+
+void Npc_Flag(int id, int index, int key, bool value) {
+	int flagset = Npc_Val(id, index);
+	if (value) {
+		flagset |= key;}
+	else {
+		flagset &= ~key;}
+	Npc_Val(id, index, flagset);}
+
+////////////////////////////////////////////////////////////////
+// Assignment & Indexing
+
+// Gives an unused id to an npc.
+// o - the npc
+// index - the npc's screen index
+int Npc_LastId = -1;
+int Npc_AssignId(int index) {
+	return Npc_AssignId(Screen->LoadNPC(index), index);}
+int Npc_AssignId(npc o, int index) {
+	int id = (Npc_LastId + 1) % NPC_DATA_COUNT;
+	while (id != Npc_LastId) {
+		if (0 == Npc_Val(id, NPC_SCREEN_INDEX)) {
+			Npc_LastId = id;
+			Array_Fill(Npc_Data, 0, id * NPC_DATA_SIZE, (id + 1) * NPC_DATA_SIZE);
+			Npc_Val(id, NPC_SCREEN_INDEX, index);
+			o->Misc[NPC_MISC_ID] = id + 1;
+			return id;}
+		id = (id + 1) % NPC_DATA_COUNT;}
+
+	int a[]="ERROR: Out of npc slots. Suspected memory leak."; TraceS(a); TraceNL();
+	return -1;}
+
+void Npc_Index() {
+	// Clear all screen indices.
+	for (int id = 0; id < NPC_DATA_COUNT; ++id) {
+		Npc_Val(id, NPC_SCREEN_INDEX, 0);}
+
+	// Assign screen indices for this frame. Also registers new npcs.
+	for (int index = 1; index <= Screen->NumNPCs(); ++index) {
+		npc o = Screen->LoadNPC(index);
+		int id = Npc_Id(o);
+		// If the npc is unassigned, give it an id.
+		if (-1 == id) {id = Npc_AssignId(o, index);}
+		// Save the screen index.
+		Npc_Val(id, NPC_SCREEN_INDEX, index);}
+
+	Npc_Indexed = true;}
+
+////////////////////////////////////////////////////////////////
+// Active Script Calls
+
+void Npc_Post() {Npc_Indexed = false;}
+
+////////////////////////////////////////////////////////////////
+// Actual Use
+
+// Creates a new npc and indexes it immediately.
+npc Npc_Create(int type) {
+	npc o = Screen->CreateNPC(type);
+	Npc_AssignId(o, Screen->NumNPCs());
+	return o;}
+
+// Gets the npc with the given id.
+npc Npc_Get(int id) {
+	if (!Npc_Indexed) {Npc_Index();}
+	int index = Npc_Val(id, NPC_SCREEN_INDEX);
+	if (0 == index) {
+		int a[]="ERROR: No screen index for npc id "; TraceS(a); Trace(id);}
+	return Screen->LoadNPC(index);}
+
+// If the npc with the given id exists.
+bool Npc_Exists(int id) {
+	if (!Npc_Indexed) {Npc_Index();}
+	int index = Npc_Val(id, NPC_SCREEN_INDEX);
+	if (0 == index) {return false;}
+	npc o = Screen->LoadNPC(index);
+	return o->isValid();}
+
+// Get the npc's id, creating if needed.
+int Npc_Id(int index) {return Npc_Id(index, Screen->LoadNPC(index));}
+int Npc_Id(int index, npc o) {
+	int id = o->Misc[NPC_MISC_ID] - 1;
+	if (-1 == id) {id = Npc_AssignId(o, index);}
+	return id;}
+
+// Get the npc's id, returning -1 on failure.
+int Npc_Id(npc o) {
+	int id = o->Misc[NPC_MISC_ID] - 1;
+	return id;}
+
+// Kill and remove npc from screen.
+void Npc_Destroy(int id) {
+	Npc_Destroy(Npc_Get(id));}
+void Npc_Destroy(npc o) {
+	o->HP = 0;}

@@ -1,0 +1,122 @@
+// Misc index for the LWEAPON's consistent id.
+const int LWEAPON_MISC_ID = 0;
+
+const int LWEAPON_DATA_COUNT = 32;
+const int LWEAPON_DATA_SIZE = 1;
+int LWeapon_Data[32];
+
+// The lweapon's index on the screen. Updated when necessary in LWeapon_Index().
+const int LWEAPON_SCREEN_INDEX = 0;
+
+// If the lweapons have been indexed this frame.
+bool LWeapon_Indexed = false;
+
+////////////////////////////////////////////////////////////////
+// Basic Accessors
+
+int LWeapon_Val(int id, int index) {
+	return LWeapon_Data[id * LWEAPON_DATA_SIZE + index];}
+
+void LWeapon_Val(int id, int index, int value) {
+	LWeapon_Data[id * LWEAPON_DATA_SIZE + index] = value;}
+
+bool LWeapon_Flag(int id, int index, int key) {
+	return LWeapon_Val(id, index) & key;}
+
+void LWeapon_Flag(int id, int index, int key, bool value) {
+	int flagset = LWeapon_Val(id, index);
+	if (value) {flagset |= key;}
+	else {flagset &= ~key;}
+	LWeapon_Val(id, index, flagset);}
+
+// Get the lweapon's id, or -1 if it doesn't have one.
+int LWeapon_Id(lweapon o) {return o->Misc[LWEAPON_MISC_ID] - 1;}
+
+////////////////////////////////////////////////////////////////
+// Assignment & Indexing
+
+// Gives an unused id to an lweapon.
+// o - the lweapon
+// index - the lweapon's screen index
+int LWeapon_LastId = -1;
+int LWeapon_AssignId(int index) {
+	return LWeapon_AssignId(Screen->LoadLWeapon(index), index);}
+int LWeapon_AssignId(lweapon o) {
+	// Find the screen index.
+	for (int i = 1; i <= Screen->NumLWeapons(); ++i) {
+		lweapon o2 = Screen->LoadLWeapon(i);
+		if (o2 == o) {
+			return LWeapon_AssignId(o, i);}}
+	int a[]="ERROR: LWeapon has no screen index!"; TraceS(a); TraceNL();
+	return -1;}
+int LWeapon_AssignId(lweapon o, int index) {
+	int id = (LWeapon_LastId + 1) % LWEAPON_DATA_COUNT;
+	while (id != LWeapon_LastId) {
+		if (0 == LWeapon_Val(id, LWEAPON_SCREEN_INDEX)) {
+			LWeapon_LastId = id;
+			Array_Fill(LWeapon_Data, 0, id * LWEAPON_DATA_SIZE, (id + 1) * LWEAPON_DATA_SIZE);
+			LWeapon_Val(id, LWEAPON_SCREEN_INDEX, index);
+			o->Misc[LWEAPON_MISC_ID] = id + 1;
+			return id;}
+		id = (id + 1) % LWEAPON_DATA_COUNT;}
+
+	int a[]="ERROR: Out of lweapon slots. Suspected memory leak."; TraceS(a); TraceNL();
+	return -1;}
+
+void LWeapon_Index() {
+	if (DEBUG_ACTION == Debug_Mode || DEBUG_WEAPON == Debug_Mode) {
+		int a[]=" --- Indexing LWeapons ---"; TraceS(a); TraceNL();}
+
+  // Clear all screen indices.
+	for (int id = 0; id < LWEAPON_DATA_COUNT; ++id) {
+		LWeapon_Val(id, LWEAPON_SCREEN_INDEX, 0);}
+
+	// Assign screen indices for this frame. Also registers new lweapons.
+	for (int index = 1; index <= Screen->NumLWeapons(); ++index) {
+		lweapon o = Screen->LoadLWeapon(index);
+		int id = LWeapon_Id(o);
+		// If the lweapon is unassigned, give it an id.
+		if (-1 == id) {id = LWeapon_AssignId(o, index);}
+		// Save the screen index.
+		LWeapon_Val(id, LWEAPON_SCREEN_INDEX, index);}
+
+	LWeapon_Indexed = true;}
+
+////////////////////////////////////////////////////////////////
+// Active Script Calls
+
+void LWeapon_Post() {LWeapon_Indexed = false;}
+
+////////////////////////////////////////////////////////////////
+// Actual Use
+
+// Creates a new lweapon and indexes it immediately.
+lweapon LWeapon_Create(int type) {
+	lweapon o = Screen->CreateLWeapon(type);
+	LWeapon_AssignId(o);
+	return o;}
+
+// Gets the lweapon with the given id.
+lweapon LWeapon_Get(int id) {
+	if (!LWeapon_Indexed) {LWeapon_Index();}
+	int index = LWeapon_Val(id, LWEAPON_SCREEN_INDEX);
+	if (0 == index) {
+		int a[]="ERROR: No screen index for lweapon id "; TraceS(a); Trace(id);}
+	return Screen->LoadLWeapon(index);}
+
+// If the lweapon with the given id exists.
+bool LWeapon_Exists(int id) {
+	if (!LWeapon_Indexed) {LWeapon_Index();}
+	int index = LWeapon_Val(id, LWEAPON_SCREEN_INDEX);
+	if (0 == index) {return false;}
+	lweapon o = Screen->LoadLWeapon(index);
+	return o->isValid();}
+
+// Removes the lweapon from the screen.
+void LWeapon_Destroy(int id) {
+	if (DEBUG_WEAPON == Debug_Mode) {
+		int a[]="Destroying lweapon id "; TraceS(a); Trace(id);}
+	LWeapon_Destroy(LWeapon_Get(id));}
+void LWeapon_Destroy(lweapon o) {
+	o->X = -100;
+	o->DeadState = WDS_DEAD;}

@@ -1,0 +1,4 @@
+const int FSCR_AI_OCTOROK = 1;
+const int FSCR_AI_SPEAR_MOBLIN = 2;
+
+const int ISCR_HEART = 1;

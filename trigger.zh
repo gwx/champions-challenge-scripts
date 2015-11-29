@@ -1,0 +1,25 @@
+// Constants for action inputs.
+
+// No trigger, so disabled.
+const int TRIGGER_NONE = 0;
+// Trigger on the A button.
+const int TRIGGER_A    = 1;
+// Trigger on the B button.
+const int TRIGGER_B    = 2;
+
+////////////////////////////////////////////////////////////////
+// Use
+
+// If the given trigger was pressed this frame.
+bool Trigger_Pressed(int trigger) {
+	int flag = 0;
+	if (TRIGGER_A == trigger) {flag = KEYF_A;}
+	else if (TRIGGER_B == trigger) {flag = KEYF_B;}
+	return Input_Pressed & flag;}
+
+// If the given trigger was held this frame.
+bool Trigger_Held(int trigger) {
+	int flag = 0;
+	if (TRIGGER_A == trigger) {flag = KEYF_A;}
+	else if (TRIGGER_B == trigger) {flag = KEYF_B;}
+	return Input_Held & flag;}

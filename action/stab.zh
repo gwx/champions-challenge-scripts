@@ -1,0 +1,107 @@
+const int ACTION_STAB = 1;
+// Argument Indices
+const int ACTION_STAB_TILE = 3;
+const int ACTION_STAB_SOUND = 4;
+const int ACTION_STAB_DAMAGE = 5;
+const int ACTION_STAB_DAMAGE_TYPE = 6;
+const int ACTION_STAB_DURATION_START_DELAY = 6;
+const int ACTION_STAB_DURATION_STAB = 7;
+const int ACTION_STAB_DURATION_END_DELAY = 8;
+// Variable Indices
+const int ACTION_STAB_PHASE = 9;
+const int ACTION_STAB_TIMER = 10;
+const int ACTION_STAB_WEAPON_SLOT = 8;
+// Phases
+const int ACTION_STAB_PHASE_INIT = 0;
+const int ACTION_STAB_PHASE_START_DELAY = 1;
+const int ACTION_STAB_PHASE_STAB = 2;
+const int ACTION_STAB_PHASE_END_DELAY = 3;
+
+bool Action_Stab_Possible(int slot) {
+	return !Link_NoAct();}
+
+void Action_Stab(int slot) {
+	Link_NoMove(true);
+	Link_NoAct(true);
+
+	if (0 == Link_ActionState) {
+		Link_ActionTimer = Link_Action(slot, ACTION_STAB_DURATION_1);
+		Link_ActionState = 1;
+		if (LINK_TILE_STAND != Link_TileOffset
+				&& LINK_TILE_WALK != Link_TileOffset) {
+			Link_TileOffset = LINK_TILE_STAND;}}
+	else if (1 == Link_ActionState) {
+		--Link_ActionTimer;
+		if (Link_ActionTimer <= 0) {
+			Game->PlaySound(Link_Action(slot, ACTION_STAB_SOUND));
+			Link_TileOffset = LINK_TILE_STAB;
+			Link_ActionTimer = Link_Action(slot, ACTION_STAB_DURATION_2);
+			Link_ActionState = 2;
+			lweapon w = Screen->CreateLWeapon(LW_SCRIPT1);
+			w->Damage = Link_Action(slot, ACTION_STAB_DAMAGE);
+			Weapon_Detect(w);
+			int w_slot = w->Damage - 1;
+			Weapon_Flag(w_slot, WEAPON_F1, WEAPON_F1_DIE, true);
+			Link_Action(slot, ACTION_STAB_WEAPON_SLOT, w_slot);
+			w->OriginalTile = Link_Action(slot, ACTION_STAB_TILE) + Link->Dir;
+			w->NumFrames = 1;
+			if (DIR_UP == Link->Dir) {
+				w->HitWidth = 8;
+				w->X = Link->X;
+				w->Y = Link->Y - 6;}
+			else if (DIR_DOWN == Link->Dir) {
+				w->HitWidth = 8;
+				w->X = Link->X + 8;
+				w->Y = Link->Y + 14;}
+			else if (DIR_LEFT == Link->Dir) {
+				w->HitHeight = 8;
+				w->X = Link->X - 14;
+				w->Y = Link->Y + 8;}
+			else if (DIR_RIGHT == Link->Dir) {
+				w->HitHeight = 8;
+				w->X = Link->X + 14;
+				w->Y = Link->Y + 8;}
+			w->HitYOffset -= 4;
+			w->HitHeight += 2;
+			w->Z = Link->Z;}}
+	else if (2 == Link_ActionState) {
+		Link_TileOffset = LINK_TILE_STAB;
+		--Link_ActionTimer;
+		int w_slot = Link_Action(slot, ACTION_STAB_WEAPON_SLOT);
+		int w_index = Weapon_FindLW(w_slot);
+		if (-1 == w_index) {
+			Link_TileOffset = LINK_TILE_STAND;
+			Link_ActionTimer = Link_Action(slot, ACTION_STAB_DURATION_2);
+			Link_ActionState = 3;
+			return;}
+		lweapon w = Screen->LoadLWeapon(w_index);
+		//Screen->Rectangle(7, w->X, w->Y, w->X+w->HitWidth, w->Y+w->HitHeight, 1,
+		//									1, 0, 0, 0, false, OP_OPAQUE);
+		if (Link_ActionTimer > 0) {
+			w->DeadState = WDS_ALIVE;
+			if (DIR_UP == Link->Dir) {
+				w->X = Link->X;
+				w->Y = Link->Y - 6;}
+			else if (DIR_DOWN == Link->Dir) {
+				w->X = Link->X + 8;
+				w->Y = Link->Y + 14;}
+			else if (DIR_LEFT == Link->Dir) {
+				w->X = Link->X - 14;
+				w->Y = Link->Y + 8;}
+			else if (DIR_RIGHT == Link->Dir) {
+				w->X = Link->X + 14;
+				w->Y = Link->Y + 8;}
+			w->Z = Link->Z;}
+		else {
+			w->X = -100;
+			w->Y = -100;
+			w->DeadState = WDS_DEAD;
+			Weapon_Active(slot, false);
+			Link_TileOffset = LINK_TILE_STAND;
+			Link_ActionTimer = Link_Action(slot, ACTION_STAB_DURATION_2);
+			Link_ActionState = 3;}}
+	else if (3 == Link_ActionState) {
+		--Link_ActionTimer;
+		if (Link_ActionTimer <= 0) {
+			Link_ActionState = 0;
+			Link_Action = LA_NONE;}}}

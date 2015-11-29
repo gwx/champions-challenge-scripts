@@ -1,0 +1,516 @@
+// Total number of ai slots.
+const int AI_DATA_SLOTS = 32;
+// Total size of an ai data slot.
+const int AI_DATA_SIZE = 32;
+// All enemy data.
+int Ai_Data[1024];
+// Offset for the first flag group.
+const int AI_F1 = 0;
+const int AI_F1_ACTIVE = 0001b;
+const int AI_F1_DIR    = 1110b;
+// Ai's main npc index.
+const int AI_NPC_SCREEN_INDEX = 1;
+// Offset for the positions.
+const int AI_X = 2;
+const int AI_Y = 3;
+const int AI_Z = 4;
+// Offset for speed.
+const int AI_SPEED = 5;
+// Offset for hp.
+const int AI_HP = 6;
+// Offsets for knockback.
+const int AI_KNOCKBACK_SPEED = 7;
+const int AI_KNOCKBACK_TIME = 8;
+// General state.
+const int AI_STATE = 9;
+const int AI_STATE_TIME = 10;
+const int AI_KNOCKBACK_X = 11;
+const int AI_KNOCKBACK_Y = 12;
+// Offset for Senses.
+const int AI_SIGHT = 14; // degrees of vision
+const int AI_SCENT = 15; // pixels proximity
+// Offset for link knowledge.
+const int AI_LINK_X = 17;
+const int AI_LINK_Y = 18;
+const int AI_LINK_Z = 19;
+const int AI_LINK_TIME = 20;
+
+const int EATTR_SCRIPT = 11;
+
+// D index of origin npc argument.
+const int AI_FFCD_SLOT = 0;
+
+// Ai general flags
+const int NMISC_AI_F1 = 15;
+const int NMISC_AI_F1_LOADED = 1;
+// Ai flag slot specification.
+const int NMISC_AI_SLOT = 14;
+
+const int AIS_NONE = 0;
+const int AIS_KNOCKBACK = 1;
+
+// If the ais have been indexed.
+bool Ai_Indexed = false;
+
+// Find a free ai slot.
+int Ai_FindFree() {
+	for (int i = 0; i < AI_DATA_SLOTS; ++i) {
+		if (!Ai_Active(i)) {
+			return i;}}
+	return -1;}
+
+////////////////////////////////////////////////////////////////
+// Ai Accessors
+
+// Get the ai data value in the given slot.
+int Ai_Val(int slot, int offset) {
+	return Ai_Data[slot * AI_DATA_SIZE + offset];}
+
+// Set the ai data value in the given slot.
+void Ai_Val(int slot, int offset, int value) {
+	Ai_Data[slot * AI_DATA_SIZE + offset] = value;}
+
+// Add 1 to the given value.
+void Ai_ValInc(int slot, int offset) {
+	++Ai_Data[slot * AI_DATA_SIZE + offset];}
+
+// Add to the given value.
+void Ai_ValAdd(int slot, int offset, int delta) {
+	Ai_Data[slot * AI_DATA_SIZE + offset] += delta;}
+
+// Get the given ai flag value.
+bool Ai_Flag(int slot, int offset, int key) {
+	return Ai_Val(slot, offset) & key;}
+
+// Set the given ai flag value.
+void Ai_Flag(int slot, int offset, int key, bool flag) {
+	int val = Ai_Val(slot, offset);
+	if (flag) {
+		val |= key;}
+	else {
+		val &= ~key;}
+	Ai_Val(slot, offset, val);}
+
+bool Ai_Active(int slot) {
+	return Ai_Flag(slot, AI_F1, AI_F1_ACTIVE);}
+
+void Ai_Active(int slot, bool value) {
+	if (value) {
+		Array_Fill(Ai_Data, 0, slot * AI_DATA_SIZE, (slot + 1) * AI_DATA_SIZE);}
+	Ai_Flag(slot, AI_F1, AI_F1_ACTIVE, value);}
+
+// Turn off all ais.
+void Ai_DeactivateAll() {
+	for (int i = 0; i < AI_DATA_SLOTS; ++i) {
+		Ai_Active(i, false);}}
+
+int Ai_X(int slot) {
+	return Ai_Val(slot, AI_X);}
+
+void Ai_X(int slot, int value) {
+	Ai_Val(slot, AI_X, value);}
+
+int Ai_Y(int slot) {
+	return Ai_Val(slot, AI_Y);}
+
+void Ai_Y(int slot, int value) {
+	Ai_Val(slot, AI_Y, value);}
+
+int Ai_Z(int slot) {
+	return Ai_Val(slot, AI_Z);}
+
+void Ai_Z(int slot, int value) {
+	Ai_Val(slot, AI_Z, value);}
+
+// Center of the ai.
+int Ai_CenterX(int slot) {
+	return Ai_Val(slot, AI_X) + 7.5;}
+
+// Center of the ai.
+int Ai_CenterY(int slot) {
+	return Ai_Val(slot, AI_Y) + 11.5;}
+
+int Ai_L(int slot) {
+	return Ai_Val(slot, AI_X);}
+
+void Ai_L(int slot, int value) {
+	Ai_Val(slot, AI_X, Clamp(value, 0, 240));}
+
+int Ai_R(int slot) {
+	return Ai_Val(slot, AI_X) + 15;}
+
+int Ai_T(int slot) {
+	return Ai_Val(slot, AI_Y) + 8;}
+
+void Ai_T(int slot, int value) {
+	Ai_Val(slot, AI_Y, Clamp(value - 8, 0, 160));}
+
+int Ai_B(int slot) {
+	return Ai_Val(slot, AI_Y) + 15;}
+
+int Ai_Speed(int slot) {
+	return Ai_Val(slot, AI_SPEED);}
+
+void Ai_Speed(int slot, int value) {
+	Ai_Val(slot, AI_SPEED, value);}
+
+int Ai_HP(int slot) {
+	return Ai_Val(slot, AI_HP);}
+
+void Ai_HP(int slot, int value) {
+	Ai_Val(slot, AI_HP, value);}
+
+// Get the given ai's direction.
+int Ai_Dir(int slot) {
+	return (Ai_Val(slot, AI_F1) & AI_F1_DIR) >> 1;}
+
+// Set the given ai's direction.
+void Ai_Dir(int slot, int dir) {
+	int flagset = Ai_Val(slot, AI_F1);
+	flagset &= ~AI_F1_DIR;
+	flagset |= dir << 1;
+	Ai_Val(slot, AI_F1, flagset);}
+
+int Ai_KnockbackSpeed(int slot) {
+	return Ai_Val(slot, AI_KNOCKBACK_SPEED);}
+
+void Ai_KnockbackSpeed(int slot, int value) {
+	Ai_Val(slot, AI_KNOCKBACK_SPEED, value);}
+
+int Ai_KnockbackTime(int slot) {
+	return Ai_Val(slot, AI_KNOCKBACK_TIME);}
+
+void Ai_KnockbackTime(int slot, int value) {
+	Ai_Val(slot, AI_KNOCKBACK_TIME, value);}
+
+int Ai_KnockbackX(int slot) {
+	return Ai_Val(slot, AI_KNOCKBACK_X);}
+
+void Ai_KnockbackX(int slot, int value) {
+	Ai_Val(slot, AI_KNOCKBACK_X, value);}
+
+int Ai_KnockbackY(int slot) {
+	return Ai_Val(slot, AI_KNOCKBACK_Y);}
+
+void Ai_KnockbackY(int slot, int value) {
+	Ai_Val(slot, AI_KNOCKBACK_Y, value);}
+
+int Ai_State(int slot) {
+	return Ai_Val(slot, AI_STATE);}
+
+void Ai_State(int slot, int value) {
+	Ai_Val(slot, AI_STATE, value);}
+
+int Ai_StateTime(int slot) {
+	return Ai_Val(slot, AI_STATE_TIME);}
+
+void Ai_StateTime(int slot, int value) {
+	Ai_Val(slot, AI_STATE_TIME, value);}
+
+int Ai_Sight(int slot) {
+	return Ai_Val(slot, AI_SIGHT);}
+
+void Ai_Sight(int slot, int value) {
+	Ai_Val(slot, AI_SIGHT, value);}
+
+int Ai_Scent(int slot) {
+	return Ai_Val(slot, AI_SCENT);}
+
+void Ai_Scent(int slot, int value) {
+	Ai_Val(slot, AI_SCENT, value);}
+
+int Ai_NpcScreenIndex(int slot) {
+	if (!Ai_Indexed) {Ai_Index();}
+	return Ai_Val(slot, AI_NPC_SCREEN_INDEX);}
+
+void Ai_Index() {
+	// Clear all screen indices.
+	for (int i = 0; i < AI_DATA_SLOTS; ++i) {
+		Ai_Val(i, AI_NPC_SCREEN_INDEX, 0);}
+	// Run through each npc and apply.
+	for (int i = 1; i <= Screen->NumNPCs(); ++i) {
+		npc guy = Screen->LoadNPC(i);
+		Ai_Val(Ai_NpcSlot(guy), AI_NPC_SCREEN_INDEX, i);}}
+
+// Get the associated slot.
+int Ai_NpcSlot(npc guy) {
+	return guy->Misc[NMISC_AI_SLOT] - 1;}
+
+// Binds the guy to use the given slot.
+void Ai_NpcSlot(npc guy, int slot) {
+	guy->Misc[NMISC_AI_SLOT] = slot + 1;}
+
+void Ai_UseNpcData(int slot, npc guy) {
+	Ai_X(slot, guy->X);
+	Ai_Y(slot, guy->Y);
+	Ai_Z(slot, guy->Z);
+	Ai_Speed(slot, guy->Step * 0.01);
+	Ai_Dir(slot, guy->Dir);
+	Ai_HP(slot, guy->HP);}
+
+int Ai_LinkX(int slot) {
+	return Ai_Val(slot, AI_LINK_X);}
+void Ai_LinkX(int slot, int value) {
+	Ai_Val(slot, AI_LINK_X, value);}
+
+int Ai_LinkY(int slot) {
+	return Ai_Val(slot, AI_LINK_Y);}
+void Ai_LinkY(int slot, int value) {
+	Ai_Val(slot, AI_LINK_Y, value);}
+
+int Ai_LinkDistance(int slot) {
+	return Distance(
+			Link_CenterX(), Link_CenterY(),
+			Ai_CenterX(slot), Ai_CenterY(slot));}
+
+int Ai_LinkZ(int slot) {
+	return Ai_Val(slot, AI_LINK_Z);}
+void Ai_LinkZ(int slot, int value) {
+	Ai_Val(slot, AI_LINK_Z, value);}
+
+int Ai_LinkTime(int slot) {
+	return Ai_Val(slot, AI_LINK_TIME);}
+void Ai_LinkTime(int slot, int value) {
+	Ai_Val(slot, AI_LINK_TIME, value);}
+
+
+
+////////////////////////////////////////////////////////////////
+
+void Ai_Init() {
+	Ai_DeactivateAll();}
+
+void Ai_Continue() {
+	Ai_DeactivateAll();}
+
+// Detects enemies.
+// Note: Must be before Weapon_Update to properly grab their hp.
+void Ai_Prepare() {
+	if (Screen_Changed) {Ai_DeactivateAll();}
+
+	// Detect each npc.
+	for (int i = 1; i <= Screen->NumNPCs(); ++i) {
+		npc guy = Screen->LoadNPC(i);
+		Ai_Detect(guy);}}
+
+// Updates enemies.
+void Ai_Update() {
+	// Update each npc.
+	for (int i = 1; i <= Screen->NumNPCs(); ++i) {
+		npc guy = Screen->LoadNPC(i);
+		Ai_Update(guy);}}
+
+void Ai_Update(npc guy) {
+	int slot = Ai_NpcSlot(guy);
+	if (-1 == slot) {return;}
+	if (!Ai_Active(slot)) {
+		guy->HP = 0;
+		return;}
+	guy->X = Ai_Val(slot, AI_X);
+	guy->Y = Ai_Val(slot, AI_Y);
+	guy->Z = Ai_Val(slot, AI_Z);
+	guy->Dir = Ai_Dir(slot);
+
+	if (AIS_KNOCKBACK == Ai_State(slot)) {
+		Ai_Move(slot, Ai_KnockbackX(slot), Ai_KnockbackY(slot));
+		Ai_ValAdd(slot, AI_STATE_TIME, -1);
+		if (Ai_StateTime(slot) <= 0) {
+			Ai_State(slot, AIS_NONE);
+			guy->CollDetection = true;}}}
+
+void Ai_Post() {
+	Ai_Indexed = false;}
+
+// Detects and loads new enemies. Returns true if newly made.
+void Ai_Detect(npc guy) {
+	// Quit if enemy has already been loaded.
+	if (guy->Misc[NMISC_AI_F1] & NMISC_AI_F1_LOADED) {return;}
+
+	// Grab loading script.
+	int scr = guy->Attributes[EATTR_SCRIPT];
+	if (0 == scr) {return;}
+
+	// Grab an empty ffc.
+	int ffc_index = FFC_FindFree();
+	if (-1 == ffc_index) {return;}
+
+	// Grab an ai slot.
+	int slot = Ai_FindFree();
+	if (-1 == slot) {return;}
+
+	// Run script.
+	ffc loader = Screen->LoadFFC(ffc_index);
+	loader->Script = scr;
+	loader->InitD[AI_FFCD_SLOT] = slot;
+
+	// Activate slot.
+	Ai_Active(slot, true);
+	Ai_NpcSlot(guy, slot);
+	Ai_UseNpcData(slot, guy);
+
+	// Mark as loaded.
+	guy->Misc[NMISC_AI_F1] |= NMISC_AI_F1_LOADED;}
+
+////////////////////////////////////////////////////////////////
+// Senses
+
+// Mark link as spotted.
+void Ai_SpotLink(int slot) {
+	Ai_LinkX(slot, Link_CenterX());
+	Ai_LinkY(slot, Link_CenterY());
+	Ai_LinkZ(slot, Link->Z);
+	Ai_LinkTime(slot, 1);}
+
+// Try to sense link.
+void Ai_SenseLink(int slot) {
+	int time = Ai_LinkTime(slot);
+	if (time > 0) {
+		Ai_LinkTime(slot, time + 1);}
+
+	int x1 = Ai_CenterX(slot);
+	int y1 = Ai_CenterY(slot);
+	int x2 = Link_CenterX();
+	int y2 = Link_CenterY();
+
+	int sight = Ai_Sight(slot);
+	if (sight > 0) {
+		int angle = Angle(Ai_CenterX(slot), Ai_CenterY(slot), Link->X+7.5, Link->Y+7.5);
+		int delta = angle - Dir_Degrees(Ai_Dir(slot));
+		delta = Abs(delta) % 360;
+		if (delta > 180) {delta = 360 - delta;}
+		if (delta <= sight * 0.5) {
+			if (Path_LineCode(x1, y1, x2, y2) & PATH_SEE) {
+				Ai_SpotLink(slot);
+				return;}}}
+
+	int scent = Ai_Scent(slot);
+	if (scent > 0 && Distance(x1, y1, x2, y2) < scent) {
+		Ai_SpotLink(slot);
+		return;}}
+
+////////////////////////////////////////////////////////////////
+// Damage
+
+void Ai_TakeHit(int slot, npc guy, int damage, int dt, int srcX, int srcY) {
+	Ai_ValAdd(slot, AI_HP, -damage);
+	if (Ai_HP(slot) <= 0) {
+		guy->HP = 0;
+		Ai_Active(slot, false);
+		return;}
+	else {
+		Ai_Knockback(slot, guy, srcX, srcY);}}
+
+////////////////////////////////////////////////////////////////
+// Screen
+
+////////////////////////////////////////////////////////////////
+// Commands
+
+void Ai_Knockback(int slot, npc guy, int srcX, int srcY) {
+	int x = Ai_CenterX(slot) - srcX;
+	int y = Ai_CenterY(slot) - srcY;
+	if (0 == x && 0 == y) {return;}
+	int dist = Sqrt(x*x+y*y);
+	int speed = Ai_KnockbackSpeed(slot);
+	x *= speed / dist;
+	y *= speed / dist;
+	guy->CollDetection = false;
+	Ai_State(slot, AIS_KNOCKBACK);
+	Ai_StateTime(slot, Ai_KnockbackTime(slot));
+	Ai_KnockbackX(slot, x);
+	Ai_KnockbackY(slot, y);}
+
+// Make a direct move
+void Ai_Move(int slot, int dx, int dy) {
+	int l = Ai_L(slot);
+	int r = Ai_R(slot);
+	int t = Ai_T(slot);
+	int b = Ai_B(slot);
+	int speed = Ai_Speed(slot);
+	int step[3];
+	Path_Step(l, r, t, b, dx, dy, PATH_MOVE, step);
+	Ai_L(slot, step[0]);
+	Ai_T(slot, step[1]);}
+
+// Move towards target.
+void Ai_MoveTowards(int slot, int x, int y) {
+	int l = Ai_L(slot);
+	int r = Ai_R(slot);
+	int t = Ai_T(slot);
+	int b = Ai_B(slot);
+	int speed = Ai_Speed(slot);
+	int dx = x - Ai_CenterX(slot);
+	int dy = y - Ai_CenterY(slot);
+	int distance = Sqrt(dx*dx+dy*dy);
+	if (speed < distance) {
+		int factor = speed / distance;
+		dx *= factor;
+		dy *= factor;}
+	int step[3];
+	Path_Step(l, r, t, b, dx, dy, PATH_MOVE, step);
+	Ai_L(slot, step[0]);
+	Ai_T(slot, step[1]);
+	Ai_Dir(slot, AngleDir4(Angle(0, 0, step[0] - l, step[1] - t)));}
+
+// How far we are from alignment with the coordinates.
+int Ai_AlignDistance(int slot, int x, int y) {
+	int dx = Abs(x - Ai_CenterX(slot));
+	int dy = Abs(y - Ai_CenterY(slot));
+	return Max(dx, dy);}
+
+// Try to align themselves with the target.
+void Ai_MoveAlign(int slot, int x, int y) {
+	int ai_x = Ai_CenterX(slot);
+	int ai_y = Ai_CenterY(slot);
+	int dx = x - ai_x;
+	int dy = y - ai_y;
+
+	if (Abs(dx) <= Abs(dy)) {
+		Ai_MoveTowards(slot, (x + ai_x) * 0.5, ai_y);}
+	else {
+		Ai_MoveTowards(slot, ai_x, (y + ai_y) * 0.5);}}
+
+// Wander around.
+const int AI_WANDER_DIST = 0;
+const int AI_WANDER_ANGLE = 1;
+const int AI_WANDER_WAIT = 2;
+
+void Ai_Wander(int slot, int data) {
+	// If we're stopped pick a new direction. And wait for a while.
+	if (data[AI_WANDER_DIST] <= 0) {
+		data[AI_WANDER_DIST] = Rand(100) + 100;
+		data[AI_WANDER_ANGLE] = Rand(361) - 180;
+		data[AI_WANDER_WAIT] = Rand(120) - 60;
+		return;}
+
+	int l = Ai_L(slot);
+	int r = Ai_R(slot);
+	int t = Ai_T(slot);
+	int b = Ai_B(slot);
+	int speed = Ai_Speed(slot);
+	int dx = Cos(data[AI_WANDER_ANGLE]) * speed;
+	int dy = Sin(data[AI_WANDER_ANGLE]) * speed;
+
+	// See how far we can move.
+	int step[3];
+	Path_Step(l, r, t, b, dx, dy, PATH_MOVE, step);
+	//if (step[1] < 8) {step[1] = 8;}
+
+	int distance = step[2];
+
+	// If we can no longer move in the current direction, pick a new direction
+	// (next round).
+	if (distance <= 0) {
+		data[AI_WANDER_DIST] = 0;
+		return;}
+
+	// Rest
+	if (data[AI_WANDER_WAIT] > 0) {
+		--data[AI_WANDER_WAIT];
+		return;}
+
+	Ai_L(slot, step[0]);
+	Ai_T(slot, step[1]);
+	Ai_Dir(slot, AngleDir4(Angle(0, 0, step[0] - l, step[1] - t)));
+
+	data[AI_WANDER_DIST] -= distance;}

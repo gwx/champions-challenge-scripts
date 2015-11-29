@@ -1,0 +1,37 @@
+// Move a bounding box by the given amount.
+void Box_Move(int box, int dx, int dy) {
+	box[DIR_UP] += dy;
+	box[DIR_DOWN] += dy;
+	box[DIR_LEFT] += dx;
+	box[DIR_RIGHT] += dx;}
+
+// Draw a box to the screen.
+void Box_Draw(int box, int layer, int color, int opacity) {
+	Screen->Rectangle(layer, box[DIR_LEFT], box[DIR_UP], box[DIR_RIGHT], box[DIR_DOWN],
+										color, 1, 0, 0, 0, false, opacity);}
+
+// Get the edge/corner of a box.
+// box - the box to get the edge of
+// dir - which edge/corner to get
+// coords - 2 element array to fill with results.
+void Box_Edge(int box, int dir, int coords) {
+	int x = Dir_X(dir);
+	if (-1 == x) {coords[0] = box[DIR_LEFT];}
+	else if (1 == x) {coords[0] = box[DIR_RIGHT];}
+	else {coords[0] = (box[DIR_LEFT] + box[DIR_RIGHT]) / 2;}
+	int y = Dir_Y(dir);
+	if (-1 == y) {coords[1] = box[DIR_UP];}
+	else if (1 == y) {coords[1] = box[DIR_DOWN];}
+	else {coords[1] = (box[DIR_UP] + box[DIR_DOWN]) / 2;}}
+
+// Gets the distance to the next quarter tile border.
+int Box_BorderDistance(int box, int dir) {
+	// Right and Down
+	if (dir & 1) {
+		int edge = (15 - (box[dir] % 8)) % 8;
+		return edge;}
+	// Left and Up
+	else {
+		int edge = box[dir] % 8;
+		if (edge < 0) {edge += 8;}
+		return edge;}}

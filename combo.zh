@@ -1,0 +1,8 @@
+// Slash at the combo.
+void Combo_Slash(int x, int y) {
+	Combo_Slash(ComboAt(x, y));}
+void Combo_Slash(int location) {
+	int ct = Screen->ComboT[location];
+	if (CT_BUSHNEXT == ct
+			|| CT_TALLGRASSNEXT == ct) {
+		++Screen->ComboD[location];}}

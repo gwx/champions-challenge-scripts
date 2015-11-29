@@ -1,0 +1,2 @@
+int Angle(int dx, int dy) {
+	return ArcTan(dx, dy) * 57.2958;}

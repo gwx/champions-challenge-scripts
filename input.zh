@@ -1,0 +1,156 @@
+const int KEY_UP = 0;
+const int KEY_DOWN = 1;
+const int KEY_LEFT = 2;
+const int KEY_RIGHT = 3;
+const int KEY_A = 4;
+const int KEY_B = 5;
+const int KEY_L = 6;
+const int KEY_R = 7;
+const int KEY_EX1 = 8;
+const int KEY_EX2 = 9;
+const int KEY_EX3 = 10;
+const int KEY_EX4 = 11;
+const int KEY_MAP = 12;
+const int KEY_START = 13;
+
+const int KEYF_UP     = 00000000000001b;
+const int KEYF_DOWN   = 00000000000010b;
+const int KEYF_LEFT   = 00000000000100b;
+const int KEYF_RIGHT  = 00000000001000b;
+const int KEYF_A      = 00000000010000b;
+const int KEYF_B      = 00000000100000b;
+const int KEYF_L      = 00000001000000b;
+const int KEYF_R      = 00000010000000b;
+const int KEYF_EX1    = 00000100000000b;
+const int KEYF_EX2    = 00001000000000b;
+const int KEYF_EX3    = 00010000000000b;
+const int KEYF_EX4    = 00100000000000b;
+const int KEYF_MAP    = 01000000000000b;
+const int KEYF_START  = 10000000000000b;
+
+// The currently held keys.
+int Input_Held = 0;
+// The currently pressed keys.
+int Input_Pressed = 0;
+// The currently released keys.
+int Input_Released = 0;
+
+void Input_Prepare() {
+
+	Input_Pressed = 0;
+	Input_Released = 0;
+
+	if (Link->InputUp && !(Input_Held & KEYF_UP)) {
+		Input_Pressed |= KEYF_UP;}
+	if (!Link->InputUp && (Input_Held & KEYF_UP)) {
+		Input_Released |= KEYF_UP;}
+
+	if (Link->InputDown && !(Input_Held & KEYF_DOWN)) {
+		Input_Pressed |= KEYF_DOWN;}
+	if (!Link->InputDown && (Input_Held & KEYF_DOWN)) {
+		Input_Released |= KEYF_DOWN;}
+
+	if (Link->InputLeft && !(Input_Held & KEYF_LEFT)) {
+		Input_Pressed |= KEYF_LEFT;}
+	if (!Link->InputLeft && (Input_Held & KEYF_LEFT)) {
+		Input_Released |= KEYF_LEFT;}
+
+	if (Link->InputRight && !(Input_Held & KEYF_RIGHT)) {
+		Input_Pressed |= KEYF_RIGHT;}
+	if (!Link->InputRight && (Input_Held & KEYF_RIGHT)) {
+		Input_Released |= KEYF_RIGHT;}
+
+	if (Link->InputA && !(Input_Held & KEYF_A)) {
+		Input_Pressed |= KEYF_A;}
+	if (!Link->InputA && (Input_Held & KEYF_A)) {
+		Input_Released |= KEYF_A;}
+
+	if (Link->InputB && !(Input_Held & KEYF_B)) {
+		Input_Pressed |= KEYF_B;}
+	if (!Link->InputB && (Input_Held & KEYF_B)) {
+		Input_Released |= KEYF_B;}
+
+	if (Link->InputL && !(Input_Held & KEYF_L)) {
+		Input_Pressed |= KEYF_L;}
+	if (!Link->InputL && (Input_Held & KEYF_L)) {
+		Input_Released |= KEYF_L;}
+
+	if (Link->InputR && !(Input_Held & KEYF_R)) {
+		Input_Pressed |= KEYF_R;}
+	if (!Link->InputR && (Input_Held & KEYF_R)) {
+		Input_Released |= KEYF_R;}
+
+	if (Link->InputEx1 && !(Input_Held & KEYF_EX1)) {
+		Input_Pressed |= KEYF_EX1;}
+	if (!Link->InputEx1 && (Input_Held & KEYF_EX1)) {
+		Input_Released |= KEYF_EX1;}
+
+	if (Link->InputEx2 && !(Input_Held & KEYF_EX2)) {
+		Input_Pressed |= KEYF_EX2;}
+	if (!Link->InputEx2 && (Input_Held & KEYF_EX2)) {
+		Input_Released |= KEYF_EX2;}
+
+	if (Link->InputEx3 && !(Input_Held & KEYF_EX3)) {
+		Input_Pressed |= KEYF_EX3;}
+	if (!Link->InputEx3 && (Input_Held & KEYF_EX3)) {
+		Input_Released |= KEYF_EX3;}
+
+	if (Link->InputEx4 && !(Input_Held & KEYF_EX4)) {
+		Input_Pressed |= KEYF_EX4;}
+	if (!Link->InputEx4 && (Input_Held & KEYF_EX4)) {
+		Input_Released |= KEYF_EX4;}
+
+	if (Link->InputMap && !(Input_Held & KEYF_MAP)) {
+		Input_Pressed |= KEYF_MAP;}
+	if (!Link->InputMap && (Input_Held & KEYF_MAP)) {
+		Input_Released |= KEYF_MAP;}
+
+	if (Link->InputStart && !(Input_Held & KEYF_START)) {
+		Input_Pressed |= KEYF_START;}
+	if (!Link->InputStart && (Input_Held & KEYF_START)) {
+		Input_Released |= KEYF_START;}
+
+	Input_Held = 0;
+	if (Link->InputUp) {Input_Held |= KEYF_UP;}
+	if (Link->InputDown) {Input_Held |= KEYF_DOWN;}
+	if (Link->InputLeft) {Input_Held |= KEYF_LEFT;}
+	if (Link->InputRight) {Input_Held |= KEYF_RIGHT;}
+	if (Link->InputA) {Input_Held |= KEYF_A;}
+	if (Link->InputB) {Input_Held |= KEYF_B;}
+	if (Link->InputL) {Input_Held |= KEYF_L;}
+	if (Link->InputR) {Input_Held |= KEYF_R;}
+	if (Link->InputEx1) {Input_Held |= KEYF_EX1;}
+	if (Link->InputEx2) {Input_Held |= KEYF_EX2;}
+	if (Link->InputEx3) {Input_Held |= KEYF_EX3;}
+	if (Link->InputEx4) {Input_Held |= KEYF_EX4;}
+	if (Link->InputMap) {Input_Held |= KEYF_MAP;}
+	if (Link->InputStart) {Input_Held |= KEYF_START;}
+
+	Link->InputUp = false;
+	Link->InputDown = false;
+	Link->InputLeft = false;
+	Link->InputRight = false;
+	Link->InputA = false;
+	Link->InputB = false;
+	Link->InputL = false;
+	Link->InputR = false;
+	Link->InputEx1 = false;
+	Link->InputEx2 = false;
+	Link->InputEx3 = false;
+	Link->InputEx4 = false;
+	Link->InputMap = false;
+	Link->InputStart = false;
+	Link->PressUp = false;
+	Link->PressDown = false;
+	Link->PressLeft = false;
+	Link->PressRight = false;
+	Link->PressA = false;
+	Link->PressB = false;
+	Link->PressL = false;
+	Link->PressR = false;
+	Link->PressEx1 = false;
+	Link->PressEx2 = false;
+	Link->PressEx3 = false;
+	Link->PressEx4 = false;
+	Link->PressMap = false;
+	Link->PressStart = false;}

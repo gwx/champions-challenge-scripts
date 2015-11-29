@@ -1,0 +1,20 @@
+void Array_Fill(int array, int value, int start, int end) {
+	for (int i = start; i < end; ++i) {
+		array[i] = value;}}
+
+// Copies one array into another.
+void Array_Copy(int target, int source) {
+	Array_Copy(target, source, Min(SizeOfArray(target), SizeOfArray(source)));}
+
+// Copies one array into another.
+void Array_Copy(int target, int source, int count) {
+	for (int i = 0; i < count; ++i) {
+		target[i] = source[i];}}
+
+void Array_Copy(int target, int source, int start, int end) {
+	for (int i = start; i < end; ++i) {
+		target[i] = source[i];}}
+
+void Array_Copy(int target, int target_start, int source, int source_start, int count) {
+	for (int i = 0; i < count; ++i) {
+		target[i + target_start] = source[i + source_start];}}

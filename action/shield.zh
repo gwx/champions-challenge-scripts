@@ -1,0 +1,98 @@
+// Action type id.
+const int ACTION_SHIELD = 3;
+
+//// Argument Indices
+// Index for link's sprite offset.
+const int ACTION_SHIELD_TILE_OFFSET = 3;
+// Index for the start sound to play.
+const int ACTION_SHIELD_SOUND = 4;
+// Index for the defense damage.
+const int ACTION_SHIELD_DEFENSE = 5;
+// Index for the duration of the startup delay.
+const int ACTION_SHIELD_DURATION_START_DELAY = 6;
+// Index for the duration of the end delay.
+const int ACTION_SHIELD_DURATION_END_DELAY = 7;
+// Index for the multiplier to link's speed.
+const int ACTION_SHIELD_SPEED_MOD = 8;
+// Index for the resource type used.
+const int ACTION_SHIELD_RESOURCE = 9;
+// Index for the per frame resource cost.
+const int ACTION_SHIELD_RESOURCE_COST = 10;
+
+//// Variable Indices
+// Index for the current shield phase.
+const int ACTION_SHIELD_PHASE = 11;
+// Index for the time left in this phase.
+const int ACTION_SHIELD_TIMER = 12;
+
+//// Phases
+// Default phase.
+const int ACTION_SHIELD_PHASE_INIT = 0;
+// Startup delay phase.
+const int ACTION_SHIELD_PHASE_START_DELAY = 1;
+// The main guarding phase.
+const int ACTION_SHIELD_PHASE_MAIN = 2;
+// The end delay phase.
+const int ACTION_SHIELD_PHASE_END_DELAY = 3;
+
+// If the given shield action is possible.
+bool Action_Shield_Possible(int id) {
+	int res = Action_Val(id, ACTION_SHIELD_RESOURCE);
+	if (RES_NONE != res) {
+		int cost = Action_Val(id, ACTION_SHIELD_RESOURCE_COST);
+		if (Link_CurResource[res] < cost) {
+			return false;}}
+	return true;}
+
+// Updates the shield.
+void Action_Shield(int id) {
+	// Read variables.
+	int timer = Action_Val(id, ACTION_SHIELD_TIMER);
+	int phase = Action_Val(id, ACTION_SHIELD_PHASE);
+
+	if (timer > 0) {--timer;}
+
+	if (DEBUG_ACTION == Debug_Mode) {
+		int a[]="  Type: Shield"; TraceS(a); TraceNL();
+		int b[]="  Phase: "; TraceS(b); Trace(phase);
+		int c[]="  Timer: "; TraceS(c); Trace(timer);}
+
+	if (ACTION_SHIELD_PHASE_INIT == phase) {
+		phase = ACTION_SHIELD_PHASE_START_DELAY;
+		timer = Action_Val(id, ACTION_SHIELD_DURATION_START_DELAY);}
+
+	if (ACTION_SHIELD_PHASE_START_DELAY == phase) {
+		if (timer > 0) {
+			Link_NoMove(true);
+			Link_NoAct(true);}
+		else {
+			phase = ACTION_SHIELD_PHASE_MAIN;
+			timer = -1;
+
+			Game->PlaySound(Action_Val(id, ACTION_SHIELD_SOUND));
+			Link_TileOffsetMod += Action_Val(id, ACTION_SHIELD_TILE_OFFSET);
+			Link_SpeedMod *= Action_Val(id, ACTION_SHIELD_SPEED_MOD);
+			Damage_Add(Link_Shield, Action_Val(id, ACTION_SHIELD_DEFENSE));}}
+
+	if (ACTION_SHIELD_PHASE_MAIN == phase) {
+		int res = Action_Val(id, ACTION_SHIELD_RESOURCE);
+		Link_ResourceAdd(res, -Action_Val(id, ACTION_SHIELD_RESOURCE_COST));
+		if (!Action_Held(id) || !Link_HasResource(res)) {
+			phase = ACTION_SHIELD_PHASE_END_DELAY;
+			timer = Action_Val(id, ACTION_SHIELD_DURATION_END_DELAY);
+
+			Link_TileOffsetMod -= Action_Val(id, ACTION_SHIELD_TILE_OFFSET);
+			Link_SpeedMod /= Action_Val(id, ACTION_SHIELD_SPEED_MOD);
+			Damage_Subtract(Link_Shield, Action_Val(id, ACTION_SHIELD_DEFENSE));}}
+
+	if (ACTION_SHIELD_PHASE_END_DELAY == phase) {
+		if (timer > 0) {
+			Link_NoMove(true);
+			Link_NoAct(true);}
+		else {
+			phase = ACTION_SHIELD_PHASE_INIT;
+			Action_Active(id, false);}}
+
+	// Write variables.
+	Action_Val(id, ACTION_SHIELD_PHASE, phase);
+	Action_Val(id, ACTION_SHIELD_TIMER, timer);}

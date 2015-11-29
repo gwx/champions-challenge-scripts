@@ -1,0 +1,127 @@
+////////////////////////////////////////////////////////////////
+// Data Array
+
+// Maximum number of actions.
+const int ACTION_DATA_COUNT = 10;
+// Space allocated for each action.
+const int ACTION_DATA_SIZE = 20;
+// All action data.
+int Action_Data[200];
+
+// Index for the type of action. This determines what piece of code is run
+// when the action is performed.
+const int ACTION_TYPE = 0;
+// Index for the action's trigger. This determines when the action is run.
+const int ACTION_TRIGGER = 1;
+
+//// First flag group.
+const int ACTION_F1 = 2;
+// If this slot has been allocated.
+const int ACTION_F1_ALLOC   = 001b;
+// If this slot is currently active.
+const int ACTION_F1_ACTIVE  = 010b;
+
+// The rest of the indices are specific to the action's individual type.
+
+// This is the null action type.
+const int ACTION_NONE = 0;
+
+////////////////////////////////////////////////////////////////
+// Basic Accessors
+
+int Action_Val(int id, int index) {
+	return Action_Data[id * ACTION_DATA_SIZE + index];}
+
+void Action_Val(int id, int index, int value) {
+	Action_Data[id * ACTION_DATA_SIZE + index] = value;}
+
+bool Action_Flag(int id, int index, int key) {
+	return Action_Val(id, index) & key;}
+
+void Action_Flag(int id, int index, int key, bool value) {
+	int flagset = Action_Val(id, index);
+	if (value) {flagset |= key;}
+	else {flagset &= ~key;}
+	Action_Val(id, index, flagset);}
+
+////////////////////////////////////////////////////////////////
+// Allocation
+
+// If a given id is a valid action id.
+bool Action_ValidId(int id) {
+	return 0 <= id && id < ACTION_DATA_COUNT;}
+
+// If a given id is in use or not.
+bool Action_IsAlloc(int id) {
+	return Action_Flag(id, ACTION_F1, ACTION_F1_ALLOC);}
+
+int Action_LastId = -1;
+// Find an unused action id, mark it as used and return it.
+int Action_Alloc() {
+	int id = (Action_LastId + 1) % ACTION_DATA_COUNT;
+	while (id != Action_LastId) {
+		if (!Action_IsAlloc(id)) {
+			Action_LastId = id;
+			// Initialize action to the defalut values.
+			Array_Fill(Action_Data, 0, id * ACTION_DATA_SIZE, (id + 1) * ACTION_DATA_SIZE);
+			Action_Flag(id, ACTION_F1, ACTION_F1_ALLOC, true);
+
+			return id;}
+		id = (id + 1) % ACTION_DATA_COUNT;}
+
+	int a[]="ERROR: Out of action slots. Suspected memory leak."; TraceS(a); TraceNL();
+	return -1;}
+
+// Free an action slot.
+void Action_Free(int id) {
+	Action_Flag(id, ACTION_F1, ACTION_F1_ALLOC, false);}
+
+// Free all action slots.
+void Action_FreeAll() {
+	for (int id = 0; id < ACTION_DATA_COUNT; ++id) {
+		Action_Free(id);}}
+
+////////////////////////////////////////////////////////////////
+// Accessors
+
+int Action_Type(int id) {return Action_Val(id, ACTION_TYPE);}
+void Action_Type(int id, int value) {Action_Val(id, ACTION_TYPE, value);}
+int Action_Trigger(int id) {return Action_Val(id, ACTION_TRIGGER);}
+void Action_Trigger(int id, int value) {Action_Val(id, ACTION_TRIGGER, value);}
+bool Action_Active(int id) {return Action_Flag(id, ACTION_F1, ACTION_F1_ACTIVE);}
+void Action_Active(int id, bool value) {Action_Flag(id, ACTION_F1, ACTION_F1_ACTIVE, value);}
+
+bool Action_Pressed(int id) {
+	return Trigger_Pressed(Action_Trigger(id));}
+bool Action_Held(int id) {
+	return Trigger_Held(Action_Trigger(id));}
+
+////////////////////////////////////////////////////////////////
+// Active Script Calls
+
+void Action_Update() {
+	for (int id = 0; id < ACTION_DATA_COUNT; ++id) {
+		if (!Action_IsAlloc(id)) {continue;}
+
+		bool active = Action_Active(id);
+		if (active) {
+			if (DEBUG_ACTION == Debug_Mode) {
+				int a[]="Active action - slot "; TraceS(a); Trace(id);}
+			Action_Update(id);
+			continue;}
+
+		if (Action_Pressed(id) && Action_Possible(id)) {
+			if (DEBUG_ACTION == Debug_Mode) {
+				int a[]="Starting action - slot "; TraceS(a); Trace(id);}
+			Action_Active(id, true);
+			Action_Update(id);}}}
+
+bool Action_Possible(int id) {
+	int type = Action_Type(id);
+	if (ACTION_SLASH == type) {return Action_Slash_Possible(id);}
+	if (ACTION_SHIELD == type) {return Action_Shield_Possible(id);}}
+
+void Action_Update(int id) {
+	int type = Action_Type(id);
+	if (ACTION_SLASH == type) {Action_Slash(id);}
+	if (ACTION_SHIELD == type) {Action_Shield(id);}}

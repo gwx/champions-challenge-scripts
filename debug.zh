@@ -1,0 +1,31 @@
+const int DEBUG_COUNT = 4;
+const int DEBUG_NONE = 0;
+const int DEBUG_ACTION = 1;
+const int DEBUG_WEAPON = 2;
+const int DEBUG_ENEMY = 3;
+
+int Debug_Mode = DEBUG_NONE;
+bool Debug_Boxes = false;
+
+void Debug_Update() {
+	if (Input_Held & KEYF_EX4 && Input_Pressed & KEYF_EX2) {
+		Debug_Boxes = !Debug_Boxes;}
+
+	if (Input_Held & KEYF_EX4 && Input_Pressed & KEYF_EX3) {
+		++Debug_Mode;
+		Debug_Mode %= DEBUG_COUNT;
+
+		if (DEBUG_NONE == Debug_Mode) {
+			int a[]="Debug Mode: None"; TraceS(a); TraceNL();}
+
+		if (DEBUG_ACTION == Debug_Mode) {
+			int a[]="Debug Mode: Action"; TraceS(a); TraceNL();}
+
+		if (DEBUG_WEAPON == Debug_Mode) {
+			int a[]="Debug Mode: Weapon"; TraceS(a); TraceNL();}
+
+		if (DEBUG_ENEMY == Debug_Mode) {
+			int a[]="Debug Mode: Enemy"; TraceS(a); TraceNL();}
+
+
+	}}

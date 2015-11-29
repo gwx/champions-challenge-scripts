@@ -1,0 +1,29 @@
+global script Active {
+	void run() {
+		while (true) {
+			// Preparation Section.
+			Screen_Prepare();
+			Input_Prepare();
+
+			// Detection Section.
+			Enemy_Detect();
+			Weapon_Detect();
+
+			// Update Section.
+			Enemy_Update();
+			Weapon_Update();
+			Link_Update();
+			Debug_Update();
+
+			Waitdraw();
+
+			// Draw Section.
+			Link_Draw();
+			Menu_DrawSub();
+
+			// Post Section.
+			Npc_Post();
+			LWeapon_Post();
+			EWeapon_Post();
+
+			Waitframe();}}}

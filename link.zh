@@ -1,0 +1,307 @@
+bool Link_Alive = true;
+
+// Link's starting tile.
+int Link_TileStart = 35620;
+int Link_TileOffset;
+int Link_TileOffsetMod; // Must undo changes.
+
+const int LINK_TILE_LINK = 35620;
+const int LINK_TILE_STAND = 22;
+const int LINK_TILE_WALK = 42;
+const int LINK_TILE_SWING = 62;
+const int LINK_TILE_STAB = 82;
+
+const int LINK_ANIM_WALK_1 = 12;
+const int LINK_ANIM_WALK_TOTAL = 24;
+
+int Link_CurResource[2];
+int Link_MaxResource[2];
+int Link_Speed = 1.5;
+int Link_SpeedMod = 1.0; // Must undo changes.
+int Link_KnockbackSpeed = 0;
+int Link_KnockbackAngle = 0;
+
+int Link_State = 0;
+int Link_StateTimer = 0;
+const int LINK_STATE_NO_MOVE   = 0001b;
+const int LINK_STATE_NO_ACT    = 0010b;
+const int LINK_STATE_KNOCKBACK = 0100b;
+const int LINK_STATE_ACTED     = 1000b;
+
+int Link_ScrollDir = -1;
+
+// NOTE: Link->X is offset from Link_X by 2. This is because screen
+// transitions assume that Link->X is the left border, and as a result
+// sometimes they don't trigger when they should. So Link_X is where Link->X
+// would be if it weren't offset by 2, and now Link->X lines up with the left
+// side of link's bounding box.
+
+int Link_X = 0;
+int Link_Y = 0;
+int Link_Timer = 0;
+int Link_Action = LA_NONE;
+
+const int LA_KNOCKBACK = 30;
+const int LA_STAB = 31;
+const int LA_CUSTOM = 40;
+
+const int LINK_WALK_TOLERANCE = 8;
+
+int Link_BlinkTimer = 0;
+
+// Damage id for touching link.
+int Link_Attack;
+// Damage id for link's defense.
+int Link_Defense;
+// Damage id for link's shield.
+int Link_Shield;
+
+// Link's current class.
+int Link_Class = CLASS_KNIGHT;
+
+const int LINK_STAM_REGEN = 0.02;
+
+////////////////////////////////////////////////////////////////
+// Accessors
+
+int Link_CenterX() {return Link->X + 5.5;}
+int Link_CenterY() {return Link->Y + 9.5;}
+
+// Retrieve link's bounding box.
+void Link_ReadBox(int box) {
+	box[DIR_UP] = Link_Y + 4;
+	box[DIR_DOWN] = Link_Y + 15;
+	box[DIR_LEFT] = Link_X + 2;
+	box[DIR_RIGHT] = Link_X + 13;}
+// Set link's position based on a bounding box.
+void Link_WriteBox(int box) {
+	Link_X = box[DIR_LEFT] - 2;
+	Link_Y = box[DIR_UP] - 4;}
+
+bool Link_State(int flag) {
+	return Link_State & flag;}
+
+void Link_State(int flag, bool value) {
+	if (value) {Link_State |= flag;}
+	else {Link_State &= ~flag;}}
+
+bool Link_NoMove() {
+	return Link_State & LINK_STATE_NO_MOVE;}
+
+void Link_NoMove(bool value) {
+	Link_State(LINK_STATE_NO_MOVE, value);}
+
+bool Link_NoAct() {
+	return Link_State & LINK_STATE_NO_ACT;}
+
+void Link_NoAct(bool value) {
+	Link_State(LINK_STATE_NO_ACT, value);}
+
+bool Link_Acted() {
+	return Link_State & LINK_STATE_ACTED;}
+
+void Link_Acted(bool value) {
+	Link_State(LINK_STATE_ACTED, value);}
+
+int Link_Resource(int resource) {
+	if (RES_NONE == resource) {return -1;}
+	return Link_CurResource[resource];}
+
+bool Link_HasResource(int resource) {
+	if (RES_NONE == resource) {return true;}
+	return Link_CurResource[resource] > 0;}
+
+bool Link_HasResource(int resource, int amount) {
+	if (RES_NONE == resource) {return true;}
+	return Link_CurResource[resource] >= amount;}
+
+void Link_ResourceAdd(int resource, int value) {
+	if (RES_NONE == resource) {return;}
+	Link_CurResource[resource] += value;
+	if (Link_CurResource[resource] > Link_MaxResource[resource]) {
+		Link_CurResource[resource] = Link_MaxResource[resource];}
+	if (Link_CurResource[resource] < 0) {
+		Link_CurResource[resource] = 0;}}
+
+////////////////////////////////////////////////////////////////
+// Main
+
+void Link_Update() {
+	Link_NoMove(false);
+	Link_NoAct(false);
+	Link_Acted(false);
+
+	if (Link_BlinkTimer > 0) {--Link_BlinkTimer;}
+
+	// Faking link's position for the screen change animation.
+	if (LA_SCROLLING == Link->Action) {
+		if (-1 == Link_ScrollDir) {
+			if (-16 == Link->X) {Link_ScrollDir = DIR_RIGHT;}
+			if (256 == Link->X) {Link_ScrollDir = DIR_LEFT;}
+			if (-16 == Link->Y) {Link_ScrollDir = DIR_DOWN;}
+			if (176 == Link->Y) {Link_ScrollDir = DIR_UP;}}
+		Link_X = Clamp(Link_X - Dir_X(Link_ScrollDir) * 4, 0, 238);
+		Link_Y = Clamp(Link_Y - Dir_Y(Link_ScrollDir) * 4, 0, 160);
+		return;}
+	else if (-1 != Link_ScrollDir) {
+		Link_ScrollDir = -1;}
+
+	// Update position if we teleported.
+	if (Screen_Changed && LA_SCROLLING != Link->Action) {
+		Link_X = Clamp(Link->X, 0, 230);
+		Link->X = Link_X + 2; // See note for Link_X above.
+		Link_Y = Link->Y;
+		return;}
+
+	// Knockback
+	if (Link_State(LINK_STATE_KNOCKBACK)) {
+		if (LA_GOTHURTLAND == Link->Action) {
+			Link->Action = LA_NONE;}
+		Link_NoMove(true);
+		Link_NoAct(true);
+
+		// Do Knockback.
+		int box[4];
+		Link_ReadBox(box);
+		Terrain_BoxSlide(box, Link_KnockbackSpeed, Link_KnockbackAngle,
+										 TERRAIN_WALK | TERRAIN_ONSCREEN);
+		Link_WriteBox(box);
+
+		--Link_StateTimer;
+		if (Link_StateTimer <= 0) {
+			Link->CollDetection = true;
+			Link_State(LINK_STATE_KNOCKBACK, false);}}
+
+	// Actions
+	Action_Update();
+
+	if (!Link_NoMove()) {Link_Walk();}
+
+	if (!Link_Acted()) {
+		Link_ResourceAdd(RES_STAM, LINK_STAM_REGEN);}
+
+	Link->X = Link_X + 2;
+	Link->Y = Link_Y;
+
+	// Die
+	if (Link_CurResource[RES_LIFE] <= 0) {
+		Link->HP = 0;
+		Link->Action = LA_DYING;
+		// Get life on revive.
+		Link_CurResource[RES_LIFE] = Link_MaxResource[RES_LIFE];}}
+
+void Link_Continue() {
+	Link_CurResource[RES_LIFE] = Link_MaxResource[RES_LIFE];}
+
+void Link_Walk() {
+	if (LA_NONE != Link->Action && LA_WALKING != Link->Action) {return;}
+
+	int speed = Link_Speed * Link_SpeedMod;
+	int dir = -1;
+
+	Link_Timer += speed;
+	Link_Action = LA_WALKING;
+
+	if (Input_Held & KEYF_UP) {
+		if (Input_Held & KEYF_LEFT) {
+			if (DIR_UP != Link->Dir) {Link->Dir = DIR_LEFT;}
+			dir = DIR_LEFTUP;}
+		else if (Input_Held & KEYF_RIGHT) {
+			if (DIR_UP != Link->Dir) {Link->Dir = DIR_RIGHT;}
+			dir = DIR_RIGHTUP;;}
+		else {
+			Link->Dir = DIR_UP;
+			dir = DIR_UP;}}
+	else if (Input_Held & KEYF_DOWN) {
+		if (Input_Held & KEYF_LEFT) {
+			if (DIR_DOWN != Link->Dir) {Link->Dir = DIR_LEFT;}
+			dir = DIR_LEFTDOWN;}
+		else if (Input_Held & KEYF_RIGHT) {
+			if (DIR_DOWN != Link->Dir) {Link->Dir = DIR_RIGHT;}
+			dir = DIR_RIGHTDOWN;}
+		else {
+			Link->Dir = DIR_DOWN;
+			dir = DIR_DOWN;}}
+	else if (Input_Held & KEYF_LEFT) {
+		Link->Dir = DIR_LEFT;
+		dir = DIR_LEFT;}
+	else if (Input_Held & KEYF_RIGHT) {
+		Link->Dir = DIR_RIGHT;
+		dir = DIR_RIGHT;}
+	else {
+		Link_Action = LA_NONE;
+		Link_Timer -= speed; // undo added timer above.
+		Link_ResourceAdd(RES_STAM, LINK_STAM_REGEN);}
+
+	if (-1 == dir) {return;}
+
+	int box[4];
+	Link_ReadBox(box);
+	Terrain_BoxWalk(box, speed, dir, TERRAIN_WALK);
+	Link_WriteBox(box);
+	Link->Action = LA_WALKING;}
+
+void Link_Draw() {
+	Link->Invisible = true;
+
+	// Walking
+	if (LA_NONE == Link_Action
+			|| LA_WALKING == Link_Action
+			|| LA_SCROLLING == Link->Action) {
+		Link_Timer %= LINK_ANIM_WALK_TOTAL;
+		if (Link_Timer < LINK_ANIM_WALK_1) {
+			Link_TileOffset = LINK_TILE_STAND;}
+		else {
+			Link_TileOffset = LINK_TILE_WALK;}}
+
+	if (!(Link_BlinkTimer & 10b)) {
+		int tile = Link_TileStart;
+		tile += Link_TileOffset;
+		tile += Link_TileOffsetMod;
+		tile += Link->Dir;
+
+		Screen->FastTile(0, Link_X, Link_Y, tile, 6, OP_OPAQUE);}
+
+	if (Debug_Boxes) {
+		int box[4];
+		Link_ReadBox(box);
+		Box_Draw(box, 7, 23, OP_OPAQUE);}}
+
+void Link_TakeDamage(int damage, int srcX, int srcY) {
+	int a[]="HIT"; TraceS(a); TraceNL();
+
+	int tmp_damage[4];
+	Damage_Read(tmp_damage, damage);
+	Damage_SubLocal(tmp_damage, Link_Defense);
+
+	int dx = srcX - Link_CenterX();
+	int dy = srcY - Link_CenterY();
+	// Shield direction is very permissive for now. Later I might change it to
+	// proper angle detection.
+	if (Dir_Major(dx, dy) == Link->Dir || Dir_Minor(dx, dy) == Link->Dir) {
+		Damage_SubLocal(tmp_damage, Link_Shield);}
+
+	if (tmp_damage[DAMAGE_KNOCKBACK] > 0) {
+		Link_Knockback(tmp_damage[DAMAGE_KNOCKBACK], -dx, -dy);}
+
+	int total_damage = 0;
+	for (int dt = 1; dt < DAMAGE_TYPE_COUNT; ++dt) {
+		total_damage += tmp_damage[dt];}
+
+	if (total_damage <= 0) {
+		Game->PlaySound(6);}
+	else {
+		Link_CurResource[RES_LIFE] -= total_damage;}}
+
+void Link_Knockback(int power, int dx, int dy) {
+	if (0 == dx && 0 == dy) {return;}
+	Link_KnockbackSpeed = power;
+	Link_KnockbackAngle = Angle(dx, dy);
+	Link_StateTimer = 6;
+	Link_State(LINK_STATE_KNOCKBACK, true);
+	Link->CollDetection = false;}
+
+void Link_Init() {
+	Link_Attack = Damage_Alloc();
+	Link_Defense = Damage_Alloc();
+	Link_Shield = Damage_Alloc();}

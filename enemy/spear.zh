@@ -1,0 +1,257 @@
+// Custom state id for attacking with the spear.
+const int ENEMY_SPEAR_STATE_ATTACK = 100;
+
+// State indices
+const int ENEMY_SPEAR_ATTACK_PHASE = 9;
+const int ENEMY_SPEAR_ATTACK_TIMER = 10;
+
+//// Attack state phases.
+// Phase for the initial start delay.
+const int ENEMY_SPEAR_ATTACK_PHASE_START_DELAY = 1;
+// Phase for the spear being out.
+const int ENEMY_SPEAR_ATTACK_PHASE_MAIN = 2;
+// Phase for the end delay.
+const int ENEMY_SPEAR_ATTACK_PHASE_END_DELAY = 3;
+
+//// Tile offsets for the different actions.
+const int ENEMY_SPEAR_TILE_STAND = 0;
+const int ENEMY_SPEAR_TILE_WALK1 = 20;
+const int ENEMY_SPEAR_TILE_WALK2 = 40;
+const int ENEMY_SPEAR_TILE_STAB = 60;
+// Tile offset for the spear images.
+const int ENEMY_SPEAR_TILE_SPEAR = 102;
+
+// How close to being axis aligned with the target before attacking.
+const int ENEMY_SPEAR_ALIGN_DISTANCE = 6;
+// How close to get before you stab 'em.
+const int ENEMY_SPEAR_SPEAR_DISTANCE_MIN = 16;
+const int ENEMY_SPEAR_SPEAR_DISTANCE_MAX = 24;
+
+// Number of frames it takes to start attacking.
+const int ENEMY_SPEAR_DURATION_START_DELAY_MIN = 10;
+const int ENEMY_SPEAR_DURATION_START_DELAY_MAX= 15;
+// Number of frames the attack lasts.
+const int ENEMY_SPEAR_DURATION_STAB_MIN = 30;
+const int ENEMY_SPEAR_DURATION_STAB_MAX = 50;
+// Number of frames to wait after attacking.
+const int ENEMY_SPEAR_DURATION_END_DELAY_MIN = 25;
+const int ENEMY_SPEAR_DURATION_END_DELAY_MAX = 40;
+// How long before we lose sight of link.
+const int ENEMY_SPEAR_DURATION_PURSUE = 240;
+// Sound for the spear attacking.
+const int ENEMY_SPEAR_ATTACK_SOUND = 30;
+
+ffc script ai_spear {
+	void run() {
+		int enemy_id = this->InitD[ENEMY_FFCD_ID];
+		int npc_id = Enemy_NpcId(enemy_id);
+		if (-1 == npc_id) {return;}
+
+		npc o = Npc_Get(npc_id);
+		int base_tile = o->OriginalTile;
+
+		// Give default defenses.
+		int damage = Enemy_Defense(enemy_id);
+		Damage_Fill(damage, 5);
+
+		// Give default attack.
+		damage = Enemy_Attack(enemy_id);
+		Damage_Val(damage, DAMAGE_CRUSH, 10);
+		Damage_Val(damage, DAMAGE_KNOCKBACK, 12);
+
+		// Give detection.
+		Enemy_Sight(enemy_id, 150);
+		Enemy_Scent(enemy_id, 72);
+		// Initial detection.
+		Enemy_SenseLink(enemy_id);
+
+		// Data array keeping track of wander state.
+		int wander[3];
+		// Tracks walking animation.
+		int walk_timer = 0;
+		// Id of the spear weapon currently out.
+		int weapon_id = -1;
+
+		// Randomize these so they don't clump together as much.
+		int spear_distance = Rand(
+				ENEMY_SPEAR_SPEAR_DISTANCE_MIN,
+				ENEMY_SPEAR_SPEAR_DISTANCE_MAX);
+		int start_delay = Rand(
+				ENEMY_SPEAR_DURATION_START_DELAY_MIN,
+				ENEMY_SPEAR_DURATION_START_DELAY_MAX);
+		int stab_duration = Rand(
+				ENEMY_SPEAR_DURATION_STAB_MIN,
+				ENEMY_SPEAR_DURATION_STAB_MAX);
+		int end_delay = Rand(
+				ENEMY_SPEAR_DURATION_END_DELAY_MIN,
+				ENEMY_SPEAR_DURATION_END_DELAY_MAX);
+
+		while (true) {
+			if (DEBUG_ENEMY == Debug_Mode) {
+				int a[]="[Spear] Enemy Id: "; TraceS(a); Trace(enemy_id);
+				int b[]="  State: "; TraceS(b); Trace(Enemy_State(enemy_id));}
+
+			if (!Enemy_IsAlloc(enemy_id)) {
+				Weapon_Destroy(weapon_id);
+				return;}
+
+			if (!Npc_Exists(npc_id)) {
+				Weapon_Destroy(weapon_id);
+				Enemy_Free(enemy_id);
+				return;}
+
+			o = Npc_Get(npc_id);
+			int tile = base_tile;
+			tile += o->Dir;
+			int tile_offset = ENEMY_SPEAR_TILE_STAND;
+
+			int state = Enemy_State(enemy_id);
+
+			// Knockback, so destroy any lingering weapon.
+			if (ENEMY_STATE_KNOCKBACK == state) {
+				tile_offset = ENEMY_SPEAR_TILE_STAND;
+				Weapon_Destroy(weapon_id);
+				weapon_id = -1;}
+
+			// Standard walking around.
+			else if (ENEMY_STATE_NONE == state) {
+				// Walking animation.
+				walk_timer = (walk_timer + 1) % 48;
+				if (walk_timer < 12) {tile_offset = ENEMY_SPEAR_TILE_STAND;}
+				else if (walk_timer < 24) {tile_offset = ENEMY_SPEAR_TILE_WALK1;}
+				else if (walk_timer < 36) {tile_offset = ENEMY_SPEAR_TILE_STAND;}
+				else {tile_offset = ENEMY_SPEAR_TILE_WALK2;}
+
+				int time = Enemy_LinkTime(enemy_id);
+				// If we can't find link, wander.
+				if (-1 == time || time > ENEMY_SPEAR_DURATION_PURSUE) {
+					Enemy_Wander(enemy_id, wander);}
+
+				// We can see link, so try to get close enough to attack.
+				else {
+					int ex = Enemy_CenterX(enemy_id);
+					int ey = Enemy_CenterY(enemy_id);
+					int lx = Enemy_LinkX(enemy_id);
+					int ly = Enemy_LinkY(enemy_id);
+					int dx = lx - ex;
+					int dy = ly - ey;
+					int distance = Sqrt(dx*dx + dy*dy);
+
+					// Move towards last seen space.
+					if (distance > 32) {
+						Enemy_Walk(enemy_id, lx, ly);}
+					// If we're close and haven't seen link, give up.
+					else if (time > 0) {
+						Enemy_LinkTime(enemy_id, -1);}
+					// Move into alignment.
+					else if (Min(Abs(dx), Abs(dy)) > ENEMY_SPEAR_ALIGN_DISTANCE) {
+						// Give a tiny bit of movement towards the target, but mostly
+						// moving towards alignment.
+						int x = lx;
+						int y = ly;
+						if (Abs(dx) < Abs(dy)) {
+							y = ly * 0.1 + ey * 0.9;}
+						else {
+							x = lx * 0.1 + ex * 0.9;}
+						Enemy_Walk(enemy_id, x, y);}
+					// Move within spear range.
+					else if (distance > spear_distance) {
+						Enemy_Walk(enemy_id, lx, ly);}
+					// Stab.
+					else {
+						Enemy_State(enemy_id, ENEMY_SPEAR_STATE_ATTACK);
+						Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_PHASE, ENEMY_SPEAR_ATTACK_PHASE_START_DELAY);
+						Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_TIMER, start_delay);}}}
+
+			// In the middle of attacking.
+			else if (ENEMY_SPEAR_STATE_ATTACK == state) {
+				int phase = Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_PHASE);
+				int timer = Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_TIMER);
+
+				--timer;
+
+				if (ENEMY_SPEAR_ATTACK_PHASE_START_DELAY == phase) {
+					tile_offset = ENEMY_SPEAR_TILE_STAND;
+					if (timer <= 0) {
+						phase = ENEMY_SPEAR_ATTACK_PHASE_MAIN;
+						timer = stab_duration;
+						Game->PlaySound(ENEMY_SPEAR_ATTACK_SOUND);
+						eweapon wo = Weapon_CreateEW();
+						weapon_id = Weapon_Id(wo);
+						int damage_id = Weapon_Damage(weapon_id);
+						Damage_Val(damage_id, DAMAGE_PIERCE, o->WeaponDamage);
+						Damage_Val(damage_id, DAMAGE_KNOCKBACK, 10);
+						int dir = Dir_Major(Enemy_LinkX(enemy_id) - Enemy_CenterX(enemy_id),
+																Enemy_LinkY(enemy_id) - Enemy_CenterY(enemy_id));
+						o->Dir = dir;
+						wo->Dir = dir;
+						wo->OriginalTile = base_tile + ENEMY_SPEAR_TILE_SPEAR + dir;
+						wo->NumFrames = 1;
+						wo->HitXOffset = 0;
+						wo->HitYOffset = 0;
+						if (DIR_UP == dir) {
+							wo->HitWidth = 8;
+							wo->HitHeight = 24;
+							wo->DrawXOffset = -2;
+							wo->DrawYOffset = 2;}
+						else if (DIR_DOWN == dir) {
+							wo->HitWidth = 8;
+							wo->HitHeight = 24;
+							wo->DrawXOffset = -6;
+							wo->DrawYOffset = 8;}
+						else if (DIR_LEFT == dir) {
+							wo->HitWidth = 24;
+							wo->HitHeight = 8;
+							wo->DrawYOffset = -8;}
+						else if (DIR_RIGHT == dir) {
+							wo->HitWidth = 24;
+							wo->HitHeight = 8;
+							wo->DrawXOffset = 8;
+							wo->DrawYOffset = -8;}
+						// Readjust weapon after we mess with its box.
+						Collision_Adjust(wo);}}
+
+				if (ENEMY_SPEAR_ATTACK_PHASE_MAIN == phase) {
+					tile_offset = ENEMY_SPEAR_TILE_STAB;
+					// Ensure weapon still exists.
+					int wo_id = Weapon_ObjectId(weapon_id);
+					if (!EWeapon_Exists(wo_id)) {
+						phase = ENEMY_SPEAR_ATTACK_PHASE_END_DELAY;
+						timer = end_delay;
+						Weapon_Free(weapon_id);
+						weapon_id = -1;}
+					else if (timer > 0) {
+						eweapon wo = EWeapon_Get(wo_id);
+						wo->DeadState = WDS_ALIVE;
+						int dir = o->Dir;
+						if (DIR_UP == dir) {
+							wo->X = o->X + 2;
+							wo->Y = o->Y - 12;}
+						else if (DIR_DOWN == dir) {
+							wo->X = o->X + 6;
+							wo->Y = o->Y + 8;}
+						else if (DIR_LEFT == dir) {
+							wo->X = o->X - 14;
+							wo->Y = o->Y + 8;}
+						else if (DIR_RIGHT == dir) {
+							wo->X = o->X + 6;
+							wo->Y = o->Y + 8;}}
+					else {
+						Weapon_Destroy(weapon_id);
+						weapon_id = -1;
+						phase = ENEMY_SPEAR_ATTACK_PHASE_END_DELAY;
+						timer = end_delay;}}
+
+				if (ENEMY_SPEAR_ATTACK_PHASE_END_DELAY == phase) {
+					tile_offset = ENEMY_SPEAR_TILE_STAND;
+					if (timer <= 0) {
+						Enemy_State(enemy_id, ENEMY_STATE_NONE);
+						phase = 0;
+						timer = 0;}}
+
+				// Write back phase and timer.
+				Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_PHASE, phase);
+				Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_TIMER, timer);}
+
+			o->OriginalTile = tile + tile_offset;
+			Waitframe();}}}

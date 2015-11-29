@@ -1,0 +1,11 @@
+// How many is a single unit.
+const int RES_DIVISOR = 10;
+const int RES_COUNT = 2;
+const int RES_NONE = -1;
+const int RES_LIFE = 0;
+const int RES_STAM = 1;
+
+const int RES_TILE_START = 24506;
+const int RES_TILE_OFFSET = 20;
+const int RES_TILE_W = 12;
+const int RES_TILE_H = 12;

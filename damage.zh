@@ -1,0 +1,97 @@
+const int DAMAGE_TYPE_COUNT = 4;
+const int DAMAGE_KNOCKBACK  = 0;
+const int DAMAGE_SLASH      = 1;
+const int DAMAGE_PIERCE     = 2;
+const int DAMAGE_CRUSH      = 3;
+
+////////////////////////////////////////////////////////////////
+// Data Array
+
+const int DAMAGE_DATA_COUNT = 100;
+const int DAMAGE_DATA_SIZE = 4;
+int Damage_Data[400];
+
+// First flag group.
+const int DAMAGE_F1 = 4;
+const int DAMAGE_F1_ALLOC = 1b;
+
+////////////////////////////////////////////////////////////////
+// Basic Accessors
+
+int Damage_Val(int id, int index) {
+	return Damage_Data[id * DAMAGE_DATA_SIZE + index];}
+
+void Damage_Val(int id, int index, int value) {
+	Damage_Data[id * DAMAGE_DATA_SIZE + index] = value;}
+
+void Damage_ValAdd(int id, int index, int value) {
+	Damage_Data[id * DAMAGE_DATA_SIZE + index] += value;}
+
+void Damage_Copy(int target_id, int source_id) {
+	Array_Copy(Damage_Data, target_id * DAMAGE_DATA_SIZE,
+						 Damage_Data, source_id * DAMAGE_DATA_SIZE,
+						 DAMAGE_DATA_SIZE);}
+
+void Damage_Add(int target_id, int source_id) {
+	for (int id = 1; id <= DAMAGE_TYPE_COUNT; ++id) {
+		Damage_ValAdd(target_id, id, Damage_Val(source_id, id));}}
+
+void Damage_Subtract(int target_id, int source_id) {
+	for (int id = 1; id <= DAMAGE_TYPE_COUNT; ++id) {
+		Damage_ValAdd(target_id, id, -Damage_Val(source_id, id));}}
+
+void Damage_Fill(int id, int value) {
+	for (int type = 0; type < DAMAGE_TYPE_COUNT; ++type) {
+		Damage_Val(id, type, value);}}
+
+bool Damage_Flag(int id, int index, int key) {
+	return Damage_Val(id, index) & key;}
+
+void Damage_Flag(int id, int index, int key, bool value) {
+	int flagset = Damage_Val(id, index);
+	if (value) {flagset |= key;}
+	else {flagset &= ~key;}
+	Damage_Val(id, index, flagset);}
+
+////////////////////////////////////////////////////////////////
+// Local Manipulation
+
+// Reads a damage array into a local one.
+int Damage_Read(int local, int id) {
+	for (int i = 0; i < DAMAGE_TYPE_COUNT; ++i) {
+		local[i] = Damage_Val(id, i);}}
+
+// Subtract from a local damage array. Minimum of 0 value.
+int Damage_SubLocal(int local, int id) {
+	for (int i = 0; i < DAMAGE_TYPE_COUNT; ++i) {
+		local[i] = Max(0, local[i] - Damage_Val(id, i));}}
+
+////////////////////////////////////////////////////////////////
+// Allocation
+
+// If a given id is a valid damage id.
+bool Damage_ValidId(int id) {
+	return 0 <= id && id < DAMAGE_DATA_COUNT;}
+
+// Acquire an empty damage slot.
+int Damage_LastId = -1;
+int Damage_Alloc() {
+	int id = (Damage_LastId + 1) % DAMAGE_DATA_COUNT;
+	while (id != Damage_LastId) {
+		if (!Damage_Flag(id, DAMAGE_F1, DAMAGE_F1_ALLOC)) {
+			Damage_LastId = id;
+			Array_Fill(Damage_Data, 0, id * DAMAGE_DATA_SIZE, (id + 1) * DAMAGE_DATA_SIZE);
+			Damage_Flag(id, DAMAGE_F1, DAMAGE_F1_ALLOC, true);
+			return id;}
+		id = (id + 1) % DAMAGE_DATA_COUNT;}
+
+	int a[]="ERROR: Out of damage slots. Suspected memory leak."; TraceS(a); TraceNL();
+	return -1;}
+
+// Free a damage slot.
+void Damage_Free(int id) {
+	if (!Damage_ValidId(id)) {return;}
+	Damage_Flag(id, DAMAGE_F1, DAMAGE_F1_ALLOC, false);}
+
+////////////////////////////////////////////////////////////////
+// Use

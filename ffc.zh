@@ -1,0 +1,11 @@
+// Reserved
+
+int FFC_FindFree() {
+	int i = 1;
+	ffc f = Screen->LoadFFC(i);
+	while (i <= 32 && (f->Data !=0 || f->Script != 0)) {
+		++i;
+		f = Screen->LoadFFC(i);}
+
+	if (32 < i) {return -1;}
+	return i;}
