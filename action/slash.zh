@@ -104,6 +104,7 @@ void Action_Slash(int id) {
 
 		Action_Val(id, ACTION_SLASH_WEAPON_ID, weapon_id);
 		Weapon_Damage(weapon_id, Action_Val(id, ACTION_SLASH_DAMAGE));
+		Weapon_Flag(weapon_id, WEAPON_F1, WEAPON_F1_CUT, true);
 		//Weapon_Flag(weapon_id, WEAPON_F1, WEAPON_F1_DIE, true);
 		o->OriginalTile = Action_Val(id, ACTION_SLASH_TILE) + Link->Dir * 3;
 		o->NumFrames = 1;
