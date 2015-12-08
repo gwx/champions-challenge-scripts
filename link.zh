@@ -36,6 +36,8 @@ int Link_ScrollDir = -1;
 // would be if it weren't offset by 2, and now Link->X lines up with the left
 // side of link's bounding box.
 
+int Link_Bounds[4];
+
 int Link_X = 0;
 int Link_Y = 0;
 int Link_Timer = 0;
@@ -64,17 +66,18 @@ const int LINK_STAM_REGEN = 0.02;
 ////////////////////////////////////////////////////////////////
 // Accessors
 
-int Link_CenterX() {return Link->X + 5.5;}
-int Link_CenterY() {return Link->Y + 9.5;}
+// R[0] and R[1] set to link's center.
+void Link_Center() {
+	Box_Center(G, Link_Bounds);}
 
 // Retrieve link's bounding box.
-void Link_ReadBox(int box) {
+void Link_ReadBounds(int box) {
 	box[DIR_UP] = Link_Y + 4;
 	box[DIR_DOWN] = Link_Y + 15;
 	box[DIR_LEFT] = Link_X + 2;
 	box[DIR_RIGHT] = Link_X + 13;}
 // Set link's position based on a bounding box.
-void Link_WriteBox(int box) {
+void Link_WriteBounds(int box) {
 	Link_X = box[DIR_LEFT] - 2;
 	Link_Y = box[DIR_UP] - 4;}
 
@@ -161,11 +164,8 @@ void Link_Update() {
 		Link_NoAct(true);
 
 		// Do Knockback.
-		int box[4];
-		Link_ReadBox(box);
-		Terrain_BoxSlide(box, Link_KnockbackSpeed, Link_KnockbackAngle,
+		Terrain_BoxSlide(G, Link_Bounds, G[Link_KnockbackSpeed], G[Link_KnockbackAngle],
 										 TERRAIN_WALK | TERRAIN_ONSCREEN);
-		Link_WriteBox(box);
 
 		--Link_StateTimer;
 		if (Link_StateTimer <= 0) {
@@ -235,10 +235,7 @@ void Link_Walk() {
 
 	if (-1 == dir) {return;}
 
-	int box[4];
-	Link_ReadBox(box);
-	Terrain_BoxWalk(box, speed, dir, TERRAIN_WALK);
-	Link_WriteBox(box);
+	Terrain_BoxWalk(G, Link_Bounds, speed, dir, TERRAIN_WALK);
 	Link->Action = LA_WALKING;}
 
 void Link_Draw() {
@@ -263,9 +260,7 @@ void Link_Draw() {
 		Screen->FastTile(0, Link_X, Link_Y, tile, 6, OP_OPAQUE);}
 
 	if (Debug_Boxes) {
-		int box[4];
-		Link_ReadBox(box);
-		Box_Draw(box, 7, 23, OP_OPAQUE);}}
+		Box_Draw(G, Link_Bounds, 7, 23, OP_OPAQUE);}}
 
 void Link_TakeDamage(int damage, int srcX, int srcY) {
 	int a[]="HIT"; TraceS(a); TraceNL();
@@ -274,8 +269,9 @@ void Link_TakeDamage(int damage, int srcX, int srcY) {
 	Damage_Read(tmp_damage, damage);
 	Damage_SubLocal(tmp_damage, Link_Defense);
 
-	int dx = srcX - Link_CenterX();
-	int dy = srcY - Link_CenterY();
+	Link_Center();
+	int dx = srcX - R[0];
+	int dy = srcY - R[1];
 	// Shield direction is very permissive for now. Later I might change it to
 	// proper angle detection.
 	if (Dir_Major(dx, dy) == Link->Dir || Dir_Minor(dx, dy) == Link->Dir) {

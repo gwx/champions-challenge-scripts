@@ -1,0 +1,463 @@
+////////////////////////////////////////////////////////////////
+// Damage Numbers
+
+// Initial amount of damage weapons do.
+const int WEAPON_DAMAGE_START = 100;
+// The hp level everything is restored to each round.
+const int WEAPON_HP = 10000;
+
+////////////////////////////////////////////////////////////////
+// Data Array
+
+// Maximum number of weapons.
+const int WEAPON_DATA_COUNT = 100;
+// Space allocated for each weapon.
+const int WEAPON_DATA_SIZE = 20;
+// All weapon data.
+int Weapon_Data[2000]; // size is previous two multiplied
+
+//// First flag group.
+const int WEAPON_F1 = 0;
+// If this weapon slot has been allocated.
+const int WEAPON_F1_ALLOC  = 0001b;
+
+//// These two together determine what internal class the weapon is.
+// Set if the weapon is owned by link, unset if enemy.
+const int WEAPON_F1_TEAM   = 0010b;
+// Set if the weapon is an actual weapon object instead of the creature's
+// body.
+const int WEAPON_F1_WEAPON = 0100b;
+
+// If the weapon can cut grass.
+const int WEAPON_F1_CUT    = 1000b;
+
+// Index for the id of the weapon's corresponding object.
+const int WEAPON_OBJECT_ID = 1;
+
+// Index for weapon damage.
+const int WEAPON_DAMAGE = 2;
+
+////////////////////////////////////////////////////////////////
+// Basic Accessors
+
+int Weapon_Val(int id, int index) {
+	return Weapon_Data[id * WEAPON_DATA_SIZE + index];}
+
+void Weapon_Val(int id, int index, int value) {
+	Weapon_Data[id * WEAPON_DATA_SIZE + index] = value;}
+
+bool Weapon_Flag(int id, int index, int key) {
+	return Weapon_Val(id, index) & key;}
+
+void Weapon_Flag(int id, int index, int key, bool value) {
+	int flagset = Weapon_Val(id, index);
+	if (value) {flagset |= key;}
+	else {flagset &= ~key;}
+	Weapon_Val(id, index, flagset);}
+
+// Gets the weapon id of an object.
+int Weapon_Id(npc o) {
+	return o->Damage - WEAPON_DAMAGE_START;}
+int Weapon_Id(lweapon o) {
+	return o->Damage - WEAPON_DAMAGE_START;}
+int Weapon_Id(eweapon o) {
+	return o->Damage - WEAPON_DAMAGE_START;}
+
+////////////////////////////////////////////////////////////////
+// Allocation
+
+// If a given id is a valid weapon id.
+bool Weapon_ValidId(int id) {
+	return 0 <= id && id < WEAPON_DATA_COUNT;}
+
+// If a given weapon id is in use or not.
+bool Weapon_IsAlloc(int id) {
+	return Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC);}
+
+int Weapon_LastId = -1;
+// Find an unused weapon id, mark it as used and return it.
+int Weapon_Alloc() {
+	int id = (Weapon_LastId + 1) % WEAPON_DATA_COUNT;
+	while (id != Weapon_LastId) {
+		if (!Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC)) {
+			Weapon_LastId = id;
+			// Initialize weapon to the default values.
+			Array_Fill(Weapon_Data, 0, id * WEAPON_DATA_SIZE, (id + 1) * WEAPON_DATA_SIZE);
+			Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC, true);
+
+			return id;}
+		id = (id + 1) % WEAPON_DATA_COUNT;}
+
+	int a[]="ERROR: Out of weapon slots. Suspected memory leak."; TraceS(a); TraceNL();
+	return -1;}
+
+// Free a weapon slot.
+void Weapon_Free(int id) {
+	if (!Weapon_ValidId(id)) {return;}
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC, false);
+	if (!Weapon_IsE(id)) {
+		Damage_Free(Weapon_Damage(id));}}
+
+// Free all weapon slots.
+void Weapon_FreeAll() {
+	for (int id = 0; id < WEAPON_DATA_COUNT; ++id) {
+		Weapon_Free(id);}}
+
+////////////////////////////////////////////////////////////////
+// Object Interface
+
+// Misc Index for the weapon id. This is shared among all object types..
+const int WEAPON_MISC_WEAPON_ID = 1;
+
+// Get the source coordinates for a weapon.
+void Weapon_SourceCoords(eweapon o, int coords) {
+	// Get the edge towards the source.
+	int dir = o->Dir;
+	if (Dir_Valid(dir)) {dir = OppositeDir(dir);}
+	else {dir = -1;}
+
+	int box[4];
+	Weapon_Box(o, box);
+	Box_Edge(box, dir, coords);}
+
+// Get the source coordinates for a weapon.
+void Weapon_SourceCoords(lweapon o, int coords) {
+	// Get the edge towards the source.
+	int dir = o->Dir;
+	if (Dir_Valid(dir)) {dir = OppositeDir(dir);}
+	else {dir = -1;}
+
+	int box[4];
+	Weapon_Box(o, box);
+	Box_Edge(box, dir, coords);}
+
+// Get the source coordinates for a weapon.
+void Weapon_SourceCoords(npc o, int coords) {
+	int box[4];
+	Weapon_Box(o, box);
+	Box_Edge(box, -1, coords);}
+
+int Weapon_CenterX(int id) {
+	if (Weapon_IsEW(id)) {
+		return Weapon_CenterX(EWeapon_Get(Weapon_ObjectId(id)));}
+	if (Weapon_IsLW(id)) {
+		return Weapon_CenterX(LWeapon_Get(Weapon_ObjectId(id)));}
+	if (Weapon_IsE(id)) {
+		return Weapon_CenterX(Npc_Get(Weapon_ObjectId(id)));}}
+
+int Weapon_CenterY(int id) {
+	if (Weapon_IsEW(id)) {
+		return Weapon_CenterY(EWeapon_Get(Weapon_ObjectId(id)));}
+	if (Weapon_IsLW(id)) {
+		return Weapon_CenterY(LWeapon_Get(Weapon_ObjectId(id)));}
+	if (Weapon_IsE(id)) {
+		return Weapon_CenterY(Npc_Get(Weapon_ObjectId(id)));}}
+
+int Weapon_CenterX(eweapon w) {
+	return w->X
+		+ w->HitXOffset - COLLISION_ADJUST_EW_X
+		+ (w->HitWidth - COLLISION_ADJUST_EW_W) * 0.5;}
+
+int Weapon_CenterY(eweapon w) {
+	return w->Y
+		+ w->HitYOffset - COLLISION_ADJUST_EW_Y
+		+ (w->HitHeight - COLLISION_ADJUST_EW_H) * 0.5;}
+
+int Weapon_CenterX(lweapon w) {
+	return w->X + w->HitWidth / 2 + w->HitXOffset;}
+
+int Weapon_CenterY(lweapon w) {
+	return w->Y + w->HitHeight / 2 + w->HitYOffset;}
+
+int Weapon_CenterX(npc o) {
+	return o->X + 7.5;}
+
+int Weapon_CenterY(npc o) {
+	return o->Y + 11.5;}
+
+void Weapon_Box(int id, int box) {
+	int oid = Weapon_ObjectId(id);
+	if (Weapon_IsEW(id)) {Weapon_Box(EWeapon_Get(oid), box);}
+	else if (Weapon_IsLW(id)) {Weapon_Box(LWeapon_Get(oid), box);}
+	else if (Weapon_IsE(id)) {Weapon_Box(Npc_Get(oid), box);}}
+
+void Weapon_Box(eweapon w, int box) {
+	box[DIR_LEFT] = w->X + w->HitXOffset - COLLISION_ADJUST_EW_X;
+	box[DIR_UP] = w->Y + w->HitYOffset - COLLISION_ADJUST_EW_Y;
+	box[DIR_RIGHT] = box[DIR_LEFT] + w->HitWidth - COLLISION_ADJUST_EW_W - 1;
+	box[DIR_DOWN] = box[DIR_UP] + w->HitHeight - COLLISION_ADJUST_EW_H - 1;}
+
+void Weapon_Box(lweapon w, int box) {
+	box[DIR_LEFT] = w->X + w->HitXOffset - COLLISION_ADJUST_LW_X;
+	box[DIR_UP] = w->Y + w->HitYOffset - COLLISION_ADJUST_LW_Y;
+	box[DIR_RIGHT] = box[DIR_LEFT] + w->HitWidth - COLLISION_ADJUST_LW_W - 1;
+	box[DIR_DOWN] = box[DIR_UP] + w->HitHeight - COLLISION_ADJUST_LW_H - 1;}
+
+void Weapon_Box(npc w, int box) {
+	box[DIR_LEFT] = w->X + w->HitXOffset - COLLISION_ADJUST_NPC_X;
+	box[DIR_UP] = w->Y + w->HitYOffset - COLLISION_ADJUST_NPC_Y;
+	box[DIR_RIGHT] = box[DIR_LEFT] + w->HitWidth - COLLISION_ADJUST_NPC_W - 1;
+	box[DIR_DOWN] = box[DIR_UP] + w->HitHeight - COLLISION_ADJUST_NPC_H - 1;}
+
+////////////////////////////////////////////////////////////////
+// Accessors
+
+// If the weapon is an enemy weapon.
+bool Weapon_IsEW(int id) {
+	int flagset = Weapon_Val(id, WEAPON_F1);
+	return !(flagset & WEAPON_F1_TEAM)
+		&& (flagset & WEAPON_F1_WEAPON);}
+
+// If the weapon is an enemy.
+bool Weapon_IsE(int id) {
+	int flagset = Weapon_Val(id, WEAPON_F1);
+	return !(flagset & WEAPON_F1_TEAM)
+		&& !(flagset & WEAPON_F1_WEAPON);}
+
+// If the weapon is a link weapon.
+bool Weapon_IsLW(int id) {
+	int flagset = Weapon_Val(id, WEAPON_F1);
+	return (flagset & WEAPON_F1_TEAM)
+		&& (flagset & WEAPON_F1_WEAPON);}
+
+// Get the object if for the weapon.
+int Weapon_ObjectId(int id) {
+	return Weapon_Val(id, WEAPON_OBJECT_ID);}
+
+//int Weapon_X(int id) {return Weapon_Val(id, WEAPON_X);}
+//void Weapon_X(int id, int value) {Weapon_Val(id, WEAPON_X, value);}
+//int Weapon_Y(int id) {return Weapon_Val(id, WEAPON_Y);}
+//void Weapon_Y(int id, int value) {Weapon_Val(id, WEAPON_Y, value);}
+//int Weapon_Z(int id) {return Weapon_Val(id, WEAPON_Z);}
+//void Weapon_Z(int id, int value) {Weapon_Val(id, WEAPON_Z, value);}
+int Weapon_Damage(int slot) {return Weapon_Val(slot, WEAPON_DAMAGE);}
+void Weapon_Damage(int slot, int value) {Weapon_Val(slot, WEAPON_DAMAGE, value);}
+
+////////////////////////////////////////////////////////////////
+// Active Script Calls
+
+// Grabs unmanaged weapons.
+void Weapon_Detect() {
+	if (Screen_Changed) {Weapon_FreeAll();}
+
+	// Detects npcs.
+	for (int i = 1; i <= Screen->NumNPCs(); ++i) {
+		npc o = Screen->LoadNPC(i);
+		// Cancel if already managed.
+		if (0 != o->Misc[WEAPON_MISC_WEAPON_ID]) {continue;}
+		Weapon_Initialize(o);}
+
+	// Detects eweapons.
+	for (int i = 1; i <= Screen->NumEWeapons(); ++i) {
+		eweapon o = Screen->LoadEWeapon(i);
+		// Cancel if already managed.
+		if (0 != o->Misc[WEAPON_MISC_WEAPON_ID]) {continue;}
+		Weapon_Initialize(o);}
+
+	// Detects lweapons.
+	for (int i = 1; i <= Screen->NumLWeapons(); ++i) {
+		lweapon o = Screen->LoadLWeapon(i);
+		// Cancel if already managed.
+		if (0 != o->Misc[WEAPON_MISC_WEAPON_ID]) {continue;}
+		Weapon_Initialize(o);}}
+
+// Initializes an npc weapon, and the npc's life. Returns the weapon id.
+int Weapon_Initialize(npc o) {
+	// Only use npcs if they're already a registered enemy.
+	int enemy_id = Enemy_Id(o);
+	if (-1 == enemy_id) {return -1;}
+
+	// Assign id.
+	int id = Weapon_Alloc();
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_TEAM, false);
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_WEAPON, false);
+	Weapon_Val(id, WEAPON_OBJECT_ID, Npc_Id(o));
+	o->Misc[WEAPON_MISC_WEAPON_ID] = id + 1;
+	// Save npc's position.
+	//Weapon_X(id, o->X);
+	//Weapon_Y(id, o->Y);
+	//Weapon_Z(id, o->Z);
+
+	// Npcs use their enemy's damage instead.
+	int damage = Enemy_Attack(enemy_id);
+	Weapon_Damage(id, damage);
+	// Modify the weapon's hitbox.
+	Collision_Adjust(o);
+	// Set weapon id.
+	o->Damage = WEAPON_DAMAGE_START + id;
+	// Set starting hp.
+	o->HP = WEAPON_HP;
+	return id;}
+
+// Initializes an eweapon weapon. Returns the weapon id.
+int Weapon_Initialize(eweapon o) {
+	// Assign id.
+	int id = Weapon_Alloc();
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_TEAM, false);
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_WEAPON, true);
+	Weapon_Val(id, WEAPON_OBJECT_ID, EWeapon_Id(o));
+	o->Misc[WEAPON_MISC_WEAPON_ID] = id + 1;
+	// Save eweapon's position.
+	//Weapon_X(id, o->X);
+	//Weapon_Y(id, o->Y);
+	//Weapon_Z(id, o->Z);
+	// Weapons default to piercing damage equal to their damage value.
+	int damage = Damage_Alloc();
+	Damage_Val(damage, DAMAGE_PIERCE, o->Damage);
+	Weapon_Damage(id, damage);
+	// Modify the weapon's hitbox.
+	Collision_Adjust(o);
+	// Set weapon id.
+	o->Damage = WEAPON_DAMAGE_START + id;
+	return id;}
+
+// Initializes an lweapon weapon. Returns the weapon id.
+int Weapon_Initialize(lweapon o) {
+	// Assign id.
+	int id = Weapon_Alloc();
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_TEAM, true);
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_WEAPON, true);
+	Weapon_Val(id, WEAPON_OBJECT_ID, LWeapon_Id(o));
+	o->Misc[WEAPON_MISC_WEAPON_ID] = id + 1;
+	// Save lweapon's position.
+	//Weapon_X(id, o->X);
+	//Weapon_Y(id, o->Y);
+	//Weapon_Z(id, o->Z);
+	// Weapons default to piercing damage equal to their damage value.
+	int damage = Damage_Alloc();
+	Damage_Val(damage, DAMAGE_PIERCE, o->Damage);
+	Weapon_Damage(id, damage);
+	// Modify the weapon's hitbox.
+	Collision_Adjust(o);
+	// Set weapon id.
+	o->Damage = WEAPON_DAMAGE_START + id;
+	return id;}
+
+// Updates all weapons. Also manages link's and enemy's hp.
+void Weapon_Update() {
+	// Update each weapon.
+	for (int id = 0; id < WEAPON_DATA_COUNT; ++id) {
+		if (!Weapon_IsAlloc(id)) {continue;}
+
+		if (Weapon_Flag(id, WEAPON_F1, WEAPON_F1_CUT)) {
+			int box[4];
+			Weapon_Box(id, box);
+			Combo_Slash(box[DIR_LEFT], box[DIR_UP]);
+			Combo_Slash(box[DIR_RIGHT], box[DIR_UP]);
+			Combo_Slash(box[DIR_LEFT], box[DIR_DOWN]);
+			Combo_Slash(box[DIR_RIGHT], box[DIR_DOWN]);}
+
+		if (Weapon_IsE(id)) {
+			npc o = Npc_Get(Weapon_ObjectId(id));
+		}
+		if (Weapon_IsEW(id)) {
+			eweapon o = EWeapon_Get(Weapon_ObjectId(id));
+
+			if (Debug_Boxes) {
+				int box[4];
+				Weapon_Box(o, box);
+				Box_Draw(box, 7, 3, OP_OPAQUE);}}
+		if (Weapon_IsLW(id)) {
+			int object_id = Weapon_ObjectId(id);
+			if (!LWeapon_Exists(object_id)) {
+				Weapon_Free(id);
+				continue;}
+			lweapon o = LWeapon_Get(object_id);
+
+			if (Debug_Boxes) {
+				int box[4];
+				Weapon_Box(o, box);
+				Box_Draw(box, 7, 3, OP_OPAQUE);}}
+
+	}
+
+	// Check each npc for damage.
+	for (int npc_index = 1; npc_index <= Screen->NumNPCs(); ++npc_index) {
+		npc o = Screen->LoadNPC(npc_index);
+		if (o->HP <= 0) {continue;} // Npc is dead, skip.
+
+		// Detect weapon used and reset hp.
+		int weapon_id = WEAPON_HP - o->HP - WEAPON_DAMAGE_START;
+		o->HP = WEAPON_HP;
+		if (!Weapon_ValidId(weapon_id)) {continue;}
+
+		// Do the hit.
+		int enemy_id = Enemy_Id(o);
+		Weapon_EnemyHit(enemy_id, weapon_id);}
+
+	// Update link.
+	if (0 >= Link->HP) {return;}
+	int weapon_id = ((WEAPON_HP - Link->HP) >> 2) - WEAPON_DAMAGE_START;
+	if (Link->HP < WEAPON_HP) {Trace(weapon_id);}
+	Link->HP = WEAPON_HP;
+	if (!Weapon_ValidId(weapon_id)) {return;}
+	Weapon_LinkHit(weapon_id);}
+
+////////////////////////////////////////////////////////////////
+// Global Script Calls
+
+void Weapon_Init() {
+	Link->MaxHP = WEAPON_HP;
+	Link->HP = WEAPON_HP;
+	Weapon_FreeAll();}
+
+void Weapon_Continue() {
+	Link->MaxHP = WEAPON_HP;
+	Link->HP = WEAPON_HP;
+	Weapon_FreeAll();}
+
+////////////////////////////////////////////////////////////////
+// Use
+
+// Make a managed LW.
+lweapon Weapon_CreateLW() {
+	lweapon o = LWeapon_Create(LW_SCRIPT1);
+	Weapon_Initialize(o);
+	if (DEBUG_WEAPON == Debug_Mode) {
+		int weapon_id = Weapon_Id(o);
+		int object_id = Weapon_ObjectId(weapon_id);
+		int a[]="Creating LW:"; TraceS(a); TraceNL();
+		int b[]="  weapon id: "; TraceS(b); Trace(weapon_id);
+		int c[]="  object id: "; TraceS(c); Trace(object_id);}
+	return o;}
+
+// Make a managed EW.
+eweapon Weapon_CreateEW() {
+	eweapon o = EWeapon_Create(EW_SCRIPT1);
+	Weapon_Initialize(o);
+	return o;}
+
+// Destroys and frees the weapon.
+void Weapon_Destroy(int id) {
+	if (!Weapon_ValidId(id)) {return;}
+	Weapon_Free(id); // safe here because data remains until it's written over.
+	int object_id = Weapon_ObjectId(id);
+	if (-1 == object_id) {return;}
+	if (Weapon_IsEW(id)) {EWeapon_Destroy(object_id);}
+	else if (Weapon_IsLW(id)) {LWeapon_Destroy(object_id);}
+	else if (Weapon_IsE(id)) {
+		npc o = Npc_Get(object_id);
+		o->HP = 0;}}
+
+void Weapon_LinkHit(int weapon_id) {
+	int coords[2];
+
+	if (Weapon_IsEW(weapon_id)) {
+		eweapon o = EWeapon_Get(Weapon_ObjectId(weapon_id));
+		Weapon_SourceCoords(o, coords);}
+	else if (Weapon_IsE(weapon_id)) {
+		npc o = Npc_Get(Weapon_ObjectId(weapon_id));
+		Weapon_SourceCoords(o, coords);}
+	else {
+		coords[0] = Link_CenterX();
+		coords[1] = Link_CenterY();}
+
+	Link_BlinkTimer = 48;
+	Link_TakeDamage(Weapon_Damage(weapon_id), coords[0], coords[1]);}
+
+void Weapon_EnemyHit(int enemy_id, int weapon_id) {
+	lweapon o = LWeapon_Get(Weapon_ObjectId(weapon_id));
+	int coords[2];
+	Weapon_SourceCoords(o, coords);
+	int damage_id = Weapon_Damage(weapon_id);
+	Enemy_TakeDamage(enemy_id, damage_id, coords[0], coords[1]);}

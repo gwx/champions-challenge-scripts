@@ -1,9 +1,6 @@
 ////////////////////////////////////////////////////////////////
 // Misc. Constants
 
-// Misc index for npc's enemy id.
-const int ENEMY_NMISC_ID = 2;
-
 // D argument index for ffc scripts.
 const int ENEMY_FFCD_ID = 0;
 
@@ -14,24 +11,23 @@ const int ENEMY_NATTR_SCRIPT = 11;
 // Data Array
 
 // Maximum number of enemies.
-const int ENEMY_DATA_COUNT = 32;
+const int ENEMY_DATA_COUNT = 255;
 // Space allocated for each enemy.
-const int ENEMY_DATA_SIZE = 32;
+const int ENEMY_DATA_SIZE = 100;
 // All enemy data.
-int Enemy_Data[1024]; // size is previous two multiplied
+int Enemy_Data[25500]; // size is previous two multiplied
 
 //// First flag group.
 const int ENEMY_F1 = 0;
 // If this slot has been allocated.
 const int ENEMY_F1_ALLOC = 1b;
 
-// Index for enemy's npc id.
-const int ENEMY_NPC_ID = 1;
-
-// Indices for enemy position.
-const int ENEMY_X = 2;
-const int ENEMY_Y = 3;
-const int ENEMY_Z = 4;
+// Indices for enemy's boundaries.
+const int ENEMY_BOUNDS      = 1;
+const int ENEMY_BOUND_UP    = 1;
+const int ENEMY_BOUND_DOWN  = 2;
+const int ENEMY_BOUND_LEFT  = 3;
+const int ENEMY_BOUND_RIGHT = 4;
 
 // Indices for enemy's life and damage.
 const int ENEMY_LIFE = 5;
@@ -97,92 +93,71 @@ void Enemy_Flag(int id, int index, int key, bool value) {
 bool Enemy_ValidId(int id) {
 	return 0 <= id && id < ENEMY_DATA_COUNT;}
 
-// If a given enemy id is in use or not.
-bool Enemy_IsAlloc(int id) {
-	return Enemy_Flag(id, ENEMY_F1, ENEMY_F1_ALLOC);}
+// If a given id still exists.
+bool Enemy_Exists(int id) {
+	return Npc_Exists(id) && Npc_IsEnemy(id);}
 
-int Enemy_LastId = -1;
-// Find an unused enemy id, mark it as used and return it.
-int Enemy_Alloc() {
-	int id = (Enemy_LastId + 1) % ENEMY_DATA_COUNT;
-	while (id != Enemy_LastId) {
-		if (!Enemy_IsAlloc(id)) {
-			Enemy_LastId = id;
-			// Initialize enemy to the default values.
-			Array_Fill(Enemy_Data, 0, id * ENEMY_DATA_SIZE, (id + 1) * ENEMY_DATA_SIZE);
-			Enemy_Flag(id, ENEMY_F1, ENEMY_F1_ALLOC, true);
-			Enemy_Attack(id, Damage_Alloc());
-			Enemy_Defense(id, Damage_Alloc());
-
-			return id;}
-		id = (id + 1) % ENEMY_DATA_COUNT;}
-
-	int a[]="ERROR: Out of enemy slots. Suspected memory leak."; TraceS(a); TraceNL();
-	return -1;}
+// Create an enemy for a given npc. Returns the id.
+int Enemy_Initialize(npc o) {
+	int id = Npc_AssignId(o);
+	o->Misc[NPC_MISC_TYPE] = NPC_MISC_TYPE_ENEMY;
+	// Erase old enemy data if needed.
+	if (Enemy_Flag(id, ENEMY_F1, ENEMY_F1_ALLOC)) {
+		Enemy_Free(id);}
+	// Mark as allocated.
+	Enemy_Flag(id, ENEMY_F1, ENEMY_F1_ALLOC, true);
+	// Setup starting data.
+	Enemy_Val(id, ENEMY_BOUND_UP, o->Y + 4);
+	Enemy_Val(id, ENEMY_BOUND_DOWN, o->Y + 15);
+	Enemy_Val(id, ENEMY_BOUND_LEFT, o->X + 2);
+	Enemy_Val(id, ENEMY_BOUND_RIGHT, o->X + 13);
+	Enemy_Val(id, ENEMY_LIFE, o->HP);
+	Enemy_LinkTime(id, -1);
+	return id;}
 
 // Free an enemy slot.
 void Enemy_Free(int id) {
-	Enemy_Flag(id, ENEMY_F1, ENEMY_F1_ALLOC, false);
 	Damage_Free(Enemy_Attack(id));
-	Damage_Free(Enemy_Defense(id));}
+	Damage_Free(Enemy_Defense(id));
+	Array_Fill(Enemy_Data, 0, id * ENEMY_DATA_SIZE, (id + 1) * ENEMY_DATA_SIZE);}
 
 // Free all enemy slots.
 void Enemy_FreeAll() {
 	for (int id = 0; id < ENEMY_DATA_COUNT; ++id) {
-		Enemy_Free(id);}}
-
-////////////////////////////////////////////////////////////////
-// Npc Interface
-
-// Get the enemy id of an npc. -1 if none.
-int Enemy_Id(npc o) {
-	return o->Misc[ENEMY_NMISC_ID] - 1;}
+		if (Enemy_Flag(id, ENEMY_F1, ENEMY_F1_ALLOC)) {
+			Enemy_Free(id);}}}
 
 ////////////////////////////////////////////////////////////////
 // Accessors
 
-// Get the enemy's npc id.
-int Enemy_NpcId(int id) {
-	return Enemy_Val(id, ENEMY_NPC_ID);}
+// Gets the offset for the enemy's boundary box.
+int Enemy_Bounds(int id) {
+	return ENEMY_DATA_SIZE * id + ENEMY_BOUNDS;}
 
-// Get the enemy's npc.
-npc Enemy_Npc(int id) {
-	int npc_id = Enemy_NpcId(id);
-	if (-1 == npc_id) {
-		int a[]="ERROR: No npc for enemy "; TraceS(a); Trace(id);}
-	return Npc_Get(npc_id);}
-
-//// Position
-int Enemy_X(int id) {return Enemy_Val(id, ENEMY_X);}
-void Enemy_X(int id, int value) {Enemy_Val(id, ENEMY_X, value);}
-int Enemy_Y(int id) {return Enemy_Val(id, ENEMY_Y);}
-void Enemy_Y(int id, int value) {Enemy_Val(id, ENEMY_Y, value);}
-int Enemy_Z(int id) {return Enemy_Val(id, ENEMY_Z);}
-void Enemy_Z(int id, int value) {Enemy_Val(id, ENEMY_Z, value);}
+// Set the enemy's position.
+void Enemy_Position(int id, int x, int y) {
+	int dx = x - Enemy_Val(id, ENEMY_BOUND_LEFT);
+	int dy = y - Enemy_Val(id, ENEMY_BOUND_UP);
+	Box_Move(Enemy_Data, Enemy_Bounds(id), dx, dy);}
 
 // Get the collision box for the enemy.
-void Enemy_ReadBox(int id, int box) {
-	int x = Enemy_X(id);
-	int y = Enemy_Y(id);
-	box[DIR_UP] = y + 4;
-	box[DIR_DOWN] = y + 15;
-	box[DIR_LEFT] = x + 2;
-	box[DIR_RIGHT] = x + 13;}
+void Enemy_ReadBounds(int id, int box, int offset) {
+	Array_Copy(box, offset, Enemy_Data, Enemy_Bounds(id), 4);}
 
 // Set's the enemy's position based on a collision box.
-void Enemy_WriteBox(int id, int box) {
-	Enemy_X(id, box[DIR_LEFT] - 2);
-	Enemy_Y(id, box[DIR_UP] - 4);}
+void Enemy_WriteBounds(int id, int box, int offset) {
+	Array_Copy(Enemy_Data, Enemy_Bounds(id), box, offset, 4);}
 
-int Enemy_Dir(int id) {
-	npc o = Enemy_Npc(id);
+int Enemy_Dir(npc npcs, int id) {
+	npc o = npcs[id];
 	return o->Dir;}
-void Enemy_Dir(int id, int value) {
-	npc o = Enemy_Npc(id);
+void Enemy_Dir(npc npcs, int id, int value) {
+	npc o = npcs[id];
 	o->Dir = value;}
 
-int Enemy_CenterX(int id) {return Enemy_X(id) + 7.5;}
-int Enemy_CenterY(int id) {return Enemy_Y(id) + 9.5;}
+// Sets R[0] and R[1] to the center.
+void Enemy_Center(int id) {
+	Box_Center(Enemy_Data, Enemy_Bounds(id));}
 
 int Enemy_State(int id) {return Enemy_Val(id, ENEMY_STATE);}
 void Enemy_State(int id, int value) {Enemy_Val(id, ENEMY_STATE, value);}
@@ -209,34 +184,20 @@ void Enemy_LinkY(int id, int value) {Enemy_Val(id, ENEMY_LINK_Y, value);}
 int Enemy_LinkTime(int id) {return Enemy_Val(id, ENEMY_LINK_TIME);}
 void Enemy_LinkTime(int id, int value) {Enemy_Val(id, ENEMY_LINK_TIME, value);}
 
-int Enemy_Speed(int id) {
-	npc o = Enemy_Npc(id);
+int Enemy_Speed(npc npcs, int id) {
+	npc o = npcs[id];
 	return o->Step * 0.01;}
-
-// Get the collision box for the enemy.
-void Enemy_Box(int id, int ret_box) {
-	int x = Enemy_X(id);
-	int y = Enemy_Y(id);
-	ret_box[DIR_UP] = y + 8;
-	ret_box[DIR_DOWN] = y + 15;
-	ret_box[DIR_LEFT] = x;
-	ret_box[DIR_RIGHT] = x + 15;}
 
 ////////////////////////////////////////////////////////////////
 // Active Script Calls
 
 // Grabs unmanaged npcs.
 void Enemy_Detect() {
-	if (Screen_Changed) {Enemy_FreeAll();}
-
 	for (int i = 1; i <= Screen->NumNPCs(); ++i) {
 		npc o = Screen->LoadNPC(i);
-		int id = Enemy_Id(o);
+		int id = Npc_Id(o);
 		// If it has an id, skip it.
 		if (-1 != id) {continue;}
-
-		if (DEBUG_ENEMY == Debug_Mode) {
-			int a[]="Detected enemy!"; TraceS(a); TraceNL();}
 
 		// First, check to see if the enemy has a script to run.
 		int scr = o->Attributes[ENEMY_NATTR_SCRIPT];
@@ -247,27 +208,11 @@ void Enemy_Detect() {
 			if (-1 == ffc_index) {
 				int a[]="ERROR: No free ffc. Destroying npc.";
 				TraceS(a); TraceNL();
-				Npc_Destroy(o);
+				Remove(o);
 				continue;}}
 
-		// Create enemy.
-		id = Enemy_Alloc();
-
-		if (DEBUG_ENEMY == Debug_Mode) {
-			int a[]="  Enemy id: "; TraceS(a); Trace(id);}
-
-		Enemy_Val(id, ENEMY_NPC_ID, Npc_Id(i));
-		Enemy_X(id, o->X);
-		Enemy_Y(id, o->Y);
-		Enemy_Z(id, o->Z);
-		Enemy_Life(id, o->HP);
-		Enemy_LinkTime(id, -1);
-
-		// Mark enemy as in use.
-		o->Misc[ENEMY_NMISC_ID] = id + 1;
-
-		// No good place for this, so do it here.
-		o->DrawYOffset = 0;
+		// Initialize enemy.
+		Enemy_Initialize(o);
 
 		// Now setup the script
 		if (scr != 0) {
@@ -277,12 +222,12 @@ void Enemy_Detect() {
 
 // Moves enemies appropriately.
 void Enemy_Update() {
-	for (int id = 0; id < ENEMY_DATA_COUNT; ++id) {
-		if (!Enemy_IsAlloc(id)) {continue;}
+	if (Screen_Changed) {Enemy_FreeAll();}
 
-		if (!Npc_Exists(Enemy_NpcId(id))) {
-			Enemy_Free(id);
-			continue;}
+	for (int i = 1; i <= Screen->NumNPCs(); ++i) {
+		npc o = Screen->LoadNPC(i);
+		if (!Npc_IsEnemy(o)) {continue;}
+		int id = Npc_Id(o);
 
 		// Update link knowledge.
 		Enemy_SenseLink(id);
@@ -300,21 +245,16 @@ void Enemy_Update() {
 			else {
 				Enemy_State(id, ENEMY_STATE_NONE);}}
 
-		// Update the npc.
-		npc o = Enemy_Npc(id);
-		o->X = Enemy_X(id);
-		o->Y = Enemy_Y(id);
-		o->Z = Enemy_Z(id);
+		// Update the object.
+		o->X = Enemy_Val(id, ENEMY_BOUND_LEFT) - 2;
+		o->Y = Enemy_Val(id, ENEMY_BOUND_UP) - 4;
 
 		if (Debug_Boxes) {
-			int box[4];
-			Enemy_ReadBox(id, box);
-			Box_Draw(box, 7, 23, OP_OPAQUE);}}}
+			Box_Draw(Enemy_Data, Enemy_Bounds(id), 7, 23, OP_OPAQUE);}}}
 
 ////////////////////////////////////////////////////////////////
 // Global Script Calls
 
-void Enemy_Init() {Enemy_FreeAll();}
 void Enemy_Continue() {Enemy_FreeAll();}
 
 ////////////////////////////////////////////////////////////////
@@ -322,8 +262,9 @@ void Enemy_Continue() {Enemy_FreeAll();}
 
 // Marks link as spotted.
 void Enemy_LinkSpotted(int id) {
-	Enemy_LinkX(id, Link_CenterX());
-	Enemy_LinkY(id, Link_CenterY());
+	Link_Center();
+	Enemy_LinkX(id, R[0]);
+	Enemy_LinkY(id, R[1]);
 	Enemy_LinkTime(id, 0);}
 
 // Try to sense link.
@@ -332,10 +273,12 @@ void Enemy_SenseLink(int id) {
 	if (time >= 0) {
 		Enemy_LinkTime(id, time + 1);}
 
-	int x1 = Enemy_CenterX(id);
-	int y1 = Enemy_CenterY(id);
-	int x2 = Link_CenterX();
-	int y2 = Link_CenterY();
+	Enemy_Center(id);
+	int x1 = R[0];
+	int y1 = R[1];
+	Link_Center();
+	int x2 = R[0];
+	int y2 = R[1];
 
 	int sight = Enemy_Sight(id);
 	if (sight > 0) {
@@ -356,13 +299,14 @@ void Enemy_SenseLink(int id) {
 ////////////////////////////////////////////////////////////////
 // Damage
 
-void Enemy_TakeDamage(int id, int damage, int srcX, int srcY) {
+void Enemy_TakeDamage(npc npcs, int id, int damage, int srcX, int srcY) {
 	int tmp_damage[4];
 	Damage_Read(tmp_damage, damage);
 	Damage_SubLocal(tmp_damage, Enemy_Defense(id));
 
 	if (tmp_damage[DAMAGE_KNOCKBACK] > 0) {
-		int angle = Angle(srcX, srcY, Enemy_CenterX(id), Enemy_CenterY(id));
+		Enemy_Center(id);
+		int angle = Angle(srcX, srcY, R[0], R[1]);
 		Enemy_Knockback(id, tmp_damage[DAMAGE_KNOCKBACK], angle);}
 
 	int total_damage = 0;
@@ -374,9 +318,8 @@ void Enemy_TakeDamage(int id, int damage, int srcX, int srcY) {
 	Enemy_Life(id, life);
 
 	if (life <= 0) {
-		npc o = Enemy_Npc(id);
-		Weapon_Free(Weapon_Id(o));
-		Npc_Destroy(o);
+		npc o = npcs[id];
+		Remove(o);
 		Enemy_Free(id);}}
 
 ////////////////////////////////////////////////////////////////
@@ -390,30 +333,27 @@ void Enemy_Knockback(int id, int power, int angle) {
 
 // Move the enemy by the given amount. Returns the distance traveled.
 int Enemy_Move(int id, int distance, int angle) {
-	int box[4];
-	Enemy_ReadBox(id, box);
-	distance = Terrain_BoxSlide(box, distance, angle, TERRAIN_WALK | TERRAIN_ONSCREEN);
-	Enemy_WriteBox(id, box);
-	return distance;}
+	return Terrain_BoxSlide(Enemy_Data, Enemy_Bounds(id), distance, angle,
+													TERRAIN_WALK | TERRAIN_ONSCREEN);}
 
 // Make the enemy walk towards the given coordinates.
 // id - the enemy id
 // x, y - where the enemy is trying to move its center to
 int Enemy_Walk(int id, int x, int y) {
-	int start_x = Enemy_CenterX(id);
-	int start_y = Enemy_CenterY(id);
+	Enemy_Center(id);
+	int start_x = R[0];
+	int start_y = R[1];
 	int dx = x - start_x;
 	int dy = y - start_y;
 	int distance = Min(Enemy_Speed(id), Sqrt(dx*dx + dy*dy));
 	int angle = Angle(dx, dy);
 
-	int box[4];
-	Enemy_ReadBox(id, box);
-	distance = Terrain_BoxSlide(box, distance, angle, TERRAIN_WALK | TERRAIN_ONSCREEN);
-	Enemy_WriteBox(id, box);
+	distance = Terrain_BoxSlide(Enemy_Data, Enemy_Bounds(id), distance, angle,
+															TERRAIN_WALK | TERRAIN_ONSCREEN);
 
-	int end_x = Enemy_CenterX(id);
-	int end_y = Enemy_CenterY(id);
+	Enemy_Center(id);
+	int end_x = R[0];
+	int end_y = R[1];
 	Enemy_Dir(id, Dir_Major(end_x - start_x, end_y - start_y));
 
 	return distance;}
@@ -443,11 +383,8 @@ void Enemy_Wander(int enemy_id, int data) {
 	// Move.
 	int dx = Cos(data[ENEMY_WANDER_ANGLE]) * data[ENEMY_WANDER_DIST];
 	int dy = Sin(data[ENEMY_WANDER_ANGLE]) * data[ENEMY_WANDER_DIST];
-	int x = Enemy_CenterX(enemy_id) + dx;
-	int y = Enemy_CenterY(enemy_id) + dy;
-	int box[4];
-	Enemy_ReadBox(enemy_id, box);
-	int distance = Enemy_Walk(enemy_id, x, y);
+	Box_Center(Enemy_Data, Enemy_Bounds(enemy_id));
+	int distance = Enemy_Walk(enemy_id, R[0] + dx, R[1] + dy);
 
 	// If we can no longer move in the current direction, pick a new direction
 	// (next round).

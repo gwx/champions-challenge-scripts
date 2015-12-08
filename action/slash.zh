@@ -46,7 +46,7 @@ const int ACTION_SLASH_PHASE_SLASH_3 = 4;
 const int ACTION_SLASH_PHASE_END_DELAY = 5;
 
 // If the given slash action is possible.
-bool Action_Slash_Possible(int id) {
+bool Action_Slash_Possible(npc npcs, lweapon lweapons, eweapon eweapons, int id) {
 	int res = Action_Val(id, ACTION_SLASH_RESOURCE);
 	if (RES_NONE != res) {
 		int cost = Action_Val(id, ACTION_SLASH_RESOURCE_COST);
@@ -55,7 +55,7 @@ bool Action_Slash_Possible(int id) {
 	return !Link_NoAct();}
 
 // Updates the slash.
-void Action_Slash(int id) {
+void Action_Slash(npc npcs, lweapon lws, eweapon ews, int id) {
 	Link_NoMove(true);
 	Link_NoAct(true);
 	Link_Acted(true);
@@ -96,18 +96,15 @@ void Action_Slash(int id) {
 
 		Game->PlaySound(Action_Val(id, ACTION_SLASH_SOUND));
 		Link_TileOffset = LINK_TILE_SWING;
-		lweapon o = Weapon_CreateLW();
-		int weapon_id = Weapon_Id(o);
+		int weapon = Weapon_Create(lws, ews);
 
 		if (DEBUG_ACTION == Debug_Mode) {
 			int a[]="    Weapon Id: "; TraceS(a); Trace(weapon_id);}
 
-		Action_Val(id, ACTION_SLASH_WEAPON_ID, weapon_id);
-		Weapon_Damage(weapon_id, Action_Val(id, ACTION_SLASH_DAMAGE));
-		Weapon_Flag(weapon_id, WEAPON_F1, WEAPON_F1_CUT, true);
-		//Weapon_Flag(weapon_id, WEAPON_F1, WEAPON_F1_DIE, true);
-		o->OriginalTile = Action_Val(id, ACTION_SLASH_TILE) + Link->Dir * 3;
-		o->NumFrames = 1;
+		Action_Val(id, ACTION_SLASH_WEAPON_ID, weapon);
+		Weapon_Damage(weapon, Action_Val(id, ACTION_SLASH_DAMAGE));
+		Weapon_Flag(weapon, WEAPON_F1, WEAPON_F1_CUT, true);
+		Weapon_Tile(lws, ews, id, Action_Val(id, ACTION_SLASH_TILE) + Link->Dir * 3);
 		o->HitWidth = 14;
 		o->HitHeight = 14;
 		Collision_Adjust(o);

@@ -138,14 +138,14 @@ ffc script ai_octorok {
 
 					// If link is seen and far enough away, try to line up for a shot.
 					else if (Min(Abs(dx), Abs(dy)) > align_distance) {
-						// Give a tiny bit of movement towards the target, but mostly
+						// Give a tiny bit of movement away from the target, but mostly
 						// moving towards alignment.
 						int x = lx;
 						int y = ly;
 						if (Abs(dx) < Abs(dy)) {
-							y = ly * 0.1 + ey * 0.9;}
+							y = ly * -0.1 + ey * 1.1;}
 						else {
-							x = lx * 0.1 + ex * 0.9;}
+							x = lx * -0.1 + ex * 1.1;}
 						int dist = Enemy_Walk(enemy_id, x, y);
 						// If alignment fails, move directly to shooting.
 						if (0 == dist) {

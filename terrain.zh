@@ -39,12 +39,12 @@ int Terrain_Line(int x1, int y1, int x2, int y2) {
 	return code;}
 
 // Moves a box, sliding around terrain, up until it would hit a new 8x8 quarter tile.
-// box - 4 element box array.
+// box, offset - box array and offset
 // distance - distance to travel.
 // angle - direction (degrees) to travel in.
 // terrain - terrain flags that are needed to be "walkable".
 // return - the total distance traveled.
-int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
+int Terrain_BoxStep(int box, int offset, int distance, int angle, int terrain) {
 
 	int dx = Cos(angle) * distance;
 	int dy = Sin(angle) * distance;
@@ -57,12 +57,12 @@ int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
 
 	if (0 != dx) {
 		// Calculate distance to x border.
-		if (dx > 0) {border_dx = Box_BorderDistance(box, DIR_RIGHT);}
-		if (dx < 0) {border_dx = Box_BorderDistance(box, DIR_LEFT);}
+		if (dx > 0) {border_dx = Box_BorderDistance(box, offset, DIR_RIGHT);}
+		if (dx < 0) {border_dx = Box_BorderDistance(box, offset, DIR_LEFT);}
 
 		// If we're on the x border, check to see if we're blocked.
 		if (0 == border_dx) {
-			if (Terrain_BoxBlock(box, Cond(dx > 0, DIR_RIGHT, DIR_LEFT), terrain)) {
+			if (Terrain_BoxBlock(box, offset, Cond(dx > 0, DIR_RIGHT, DIR_LEFT), terrain)) {
 				// Since we're blocked, cancel x movement.
 				dx = 0;
 				// If we're at a decent angle, transfer the lost movement to y.
@@ -77,12 +77,12 @@ int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
 
 	if (0 != dy) {
 		// Calculate distance to y border.
-		if (dy > 0) {border_dy = Box_BorderDistance(box, DIR_DOWN);}
-		if (dy < 0) {border_dy = Box_BorderDistance(box, DIR_UP);}
+		if (dy > 0) {border_dy = Box_BorderDistance(box, offset, DIR_DOWN);}
+		if (dy < 0) {border_dy = Box_BorderDistance(box, offset, DIR_UP);}
 
 		// If we're on the y border, check to see if we're blocked.
 		if (0 == border_dy) {
-			if (Terrain_BoxBlock(box, Cond(dy > 0, DIR_DOWN, DIR_UP), terrain)) {
+			if (Terrain_BoxBlock(box, offset, Cond(dy > 0, DIR_DOWN, DIR_UP), terrain)) {
 				// Since we're blocked, cancel y movement.
 				dy = 0;
 				// If we're at a decent angle, transfer the lost movement to y.
@@ -102,7 +102,7 @@ int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
 		if (Abs(dx) > border_dx) {dx = Sign(dx) * border_dx;}
 
 		// Advance to the next border.
-		Box_Move(box, dx, 0);
+		Box_Move(box, offset, dx, 0);
 		return Abs(dx);}
 
 	// We're only moving along the y axis.
@@ -112,7 +112,7 @@ int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
 		if (Abs(dy) > border_dy) {dy = Sign(dy) * border_dy;}
 
 		// Advance to the next border.
-		Box_Move(box, 0, dy);
+		Box_Move(box, offset, 0, dy);
 		return Abs(dy);}
 
 	// We're moving diagonally and hitting the x border first.
@@ -125,7 +125,7 @@ int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
 			dy *= factor;}
 
 		// Advance to the next border.
-		Box_Move(box, dx, dy);
+		Box_Move(box, offset, dx, dy);
 		return Sqrt(dx*dx + dy*dy);}
 
 	// We're moving diagonally and hitting the y border first.
@@ -138,65 +138,65 @@ int Terrain_BoxStep(int box, int distance, int angle, int terrain) {
 			dx *= factor;}
 
 		// Advance to the next border.
-		Box_Move(box, dx, dy);
+		Box_Move(box, offset, dx, dy);
 		return Sqrt(dx*dx + dy*dy);}}
 
 // See if the terrain blocks a box from moving in a given direction. This
 // checks 0.0001 pixels in front, so it must be right on the border to be
 // effective.
-// box - 4 element box array
+// box, offset - box array and offset
 // dir - the direction of movement
 // terrain - terrain flags that are needed to be "walkable"
 // return - true if movement is blocked
-bool Terrain_BoxBlock(int box, int dir, int terrain) {
+bool Terrain_BoxBlock(int box, int offset, int dir, int terrain) {
 	int code = terrain;
 	if (dir == DIR_UP || dir == DIR_LEFTUP || dir == DIR_RIGHTUP) {
-		for (int x = box[DIR_LEFT]; x < box[DIR_RIGHT] + 0.9999; x += 8) {
-			code &= Terrain_Location(x, box[DIR_UP] - 0.0001);}
-		code &= Terrain_Location(box[DIR_RIGHT] + 0.9999, box[DIR_UP] - 0.0001);}
+		for (int x = box[offset + DIR_LEFT]; x < box[offset + DIR_RIGHT] + 0.9999; x += 8) {
+			code &= Terrain_Location(x, box[offset + DIR_UP] - 0.0001);}
+		code &= Terrain_Location(box[offset + DIR_RIGHT] + 0.9999, box[offset + DIR_UP] - 0.0001);}
 	if (dir == DIR_DOWN || dir == DIR_LEFTDOWN || dir == DIR_RIGHTDOWN) {
-		for (int x = box[DIR_LEFT]; x < box[DIR_RIGHT] + 0.9999; x += 8) {
-			code &= Terrain_Location(x, box[DIR_DOWN] + 1);}
-		code &= Terrain_Location(box[DIR_RIGHT] + 0.9999, box[DIR_DOWN] + 1);}
+		for (int x = box[offset + DIR_LEFT]; x < box[offset + DIR_RIGHT] + 0.9999; x += 8) {
+			code &= Terrain_Location(x, box[offset + DIR_DOWN] + 1);}
+		code &= Terrain_Location(box[offset + DIR_RIGHT] + 0.9999, box[offset + DIR_DOWN] + 1);}
 	if (dir == DIR_LEFT || dir == DIR_LEFTUP || dir == DIR_LEFTDOWN) {
-		for (int y = box[DIR_UP]; y < box[DIR_DOWN] + 0.9999; y += 8) {
-			code &= Terrain_Location(box[DIR_LEFT] - 0.0001, y);}
-		code &= Terrain_Location(box[DIR_LEFT] - 0.0001, box[DIR_DOWN] + 0.9999);}
+		for (int y = box[offset + DIR_UP]; y < box[offset + DIR_DOWN] + 0.9999; y += 8) {
+			code &= Terrain_Location(box[offset + DIR_LEFT] - 0.0001, y);}
+		code &= Terrain_Location(box[offset + DIR_LEFT] - 0.0001, box[offset + DIR_DOWN] + 0.9999);}
 	if (dir == DIR_RIGHT || dir == DIR_RIGHTUP || dir == DIR_RIGHTDOWN) {
-		for (int y = box[DIR_UP]; y < box[DIR_DOWN] + 0.9999; y += 8) {
-			code &= Terrain_Location(box[DIR_RIGHT] + 1, y);}
+		for (int y = box[offset + DIR_UP]; y < box[offset + DIR_DOWN] + 0.9999; y += 8) {
+			code &= Terrain_Location(box[offset + DIR_RIGHT] + 1, y);}
 		code &= Terrain_Location(box[DIR_RIGHT] + 1, box[DIR_DOWN] + 0.9999);}
 	return code != terrain;}
 
 // Moves a box, sliding around terrain, until it runs out of movement or can't
 // move anymore.
-// box - 4 element box array.
+// box, offset - box array and offset
 // distance - distance to travel.
 // angle - direction (degrees) to travel in.
 // terrain - terrain flags that are needed to be "walkable".
 // return - the total distance traveled.
-int Terrain_BoxSlide(int box, int distance, int angle, int terrain) {
+int Terrain_BoxSlide(int box, int offset, int distance, int angle, int terrain) {
 	int distance_traveled = 0;
-	int step = Terrain_BoxStep(box, distance, angle, terrain);
+	int step = Terrain_BoxStep(box, offset, distance, angle, terrain);
 	while (step > 0 && distance > 0) {
 		distance -= step;
 		distance_traveled += step;
-		step = Terrain_BoxStep(box, distance, angle, terrain);}
+		step = Terrain_BoxStep(box, offset, distance, angle, terrain);}
 	return distance_traveled;}
 
 // Moves a box in the given direction. If it encounters terrain and is close
 // enough to the edge, it will attempt to walk around it. Mostly used for
 // Link's walking.
-// box - 4 element box array.
+// box, offset - box array and offset
 // distance - distance to travel.
 // dir - direction to travel in.
 // terrain - terrain flags that are needed to be "walkable".
 // return - the total distance traveled.
-int Terrain_BoxWalk(int box, int distance, int dir, int terrain) {
+int Terrain_BoxWalk(int box, int offset, int distance, int dir, int terrain) {
 	int distance_traveled = 0;
 	int angle = Dir_Angle(dir);
 	while (distance > 0) {
-		int step = Terrain_BoxStep(box, distance, angle, terrain);
+		int step = Terrain_BoxStep(box, offset, distance, angle, terrain);
 
 		// We were stopped for some reason.
 		if (0 == step) {
@@ -208,26 +208,26 @@ int Terrain_BoxWalk(int box, int distance, int dir, int terrain) {
 
 				int dir_1 = Dir_ClockwiseCardinal(dir);
 				bool dir_1_open = false;
-				Array_Copy(test_box, box);
-				int dir_1_bd = 8 - Box_BorderDistance(test_box, OppositeDir(dir_1));
-				Box_Move(test_box, Dir_X(dir_1) * dir_1_bd, Dir_Y(dir_1) * dir_1_bd);
-				if (!Terrain_BoxBlock(test_box, dir_1, terrain)) {
+				Array_Copy(test_box, 0, box, offset, 4);
+				int dir_1_bd = 8 - Box_BorderDistance(test_box, 0, OppositeDir(dir_1));
+				Box_Move(test_box, 0, Dir_X(dir_1) * dir_1_bd, Dir_Y(dir_1) * dir_1_bd);
+				if (!Terrain_BoxBlock(test_box, 0, dir_1, terrain)) {
 					//Box_Move(test_box, Dir_X(dir_1) * (8 - dir_1_bd), Dir_Y(dir_1) * (8 - dir_1_bd));
-					if (!Terrain_BoxBlock(test_box, dir, terrain)) {dir_1_open = true;}}
+					if (!Terrain_BoxBlock(test_box, 0, dir, terrain)) {dir_1_open = true;}}
 
 				int dir_2 = Dir_CounterCardinal(dir);
 				bool dir_2_open = false;
-				Array_Copy(test_box, box);
-				int dir_2_bd = 8 - Box_BorderDistance(test_box, OppositeDir(dir_2));
-				Box_Move(test_box, Dir_X(dir_2) * dir_2_bd, Dir_Y(dir_2) * dir_2_bd);
-				if (!Terrain_BoxBlock(test_box, dir_2, terrain)) {
+				Array_Copy(test_box, 0, box, offset, 4);
+				int dir_2_bd = 8 - Box_BorderDistance(test_box, 0, OppositeDir(dir_2));
+				Box_Move(test_box, 0, Dir_X(dir_2) * dir_2_bd, Dir_Y(dir_2) * dir_2_bd);
+				if (!Terrain_BoxBlock(test_box, 0, dir_2, terrain)) {
 					//Box_Move(test_box, Dir_X(dir_2) * (8 - dir_2_bd), Dir_Y(dir_2) * (8 - dir_2_bd));
-					if (!Terrain_BoxBlock(test_box, dir, terrain)) {dir_2_open = true;}}
+					if (!Terrain_BoxBlock(test_box, 0, dir, terrain)) {dir_2_open = true;}}
 
 				if (dir_1_open) {
-					step = Terrain_BoxStep(box, distance, Dir_Angle(dir_1), terrain);}
+					step = Terrain_BoxStep(box, offset, distance, Dir_Angle(dir_1), terrain);}
 				else if (dir_2_open) {
-					step = Terrain_BoxStep(box, distance, Dir_Angle(dir_2), terrain);}}}
+					step = Terrain_BoxStep(box, offset, distance, Dir_Angle(dir_2), terrain);}}}
 
 		// Didn't know how to handle it, so exit.
 		if (0 == step) {break;}

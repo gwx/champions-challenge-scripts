@@ -1,5 +1,10 @@
-global script Active {
+global script main {
 	void run() {
+		// Object lookup by id.
+		npc npcs[255];
+		lweapon lweapons[255];
+		eweapon eweapons[255];
+
 		while (true) {
 			// Preparation Section.
 			Screen_Prepare();

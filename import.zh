@@ -1,9 +1,11 @@
 import "std.zh"
 import "string.zh"
 
+import "quests/champions-challenge/scripts/global.zh"
+
 import "quests/champions-challenge/scripts/script_ids.zh"
 
-import "quests/champions-challenge/scripts/global/active.zh"
+import "quests/champions-challenge/scripts/global/main.zh"
 import "quests/champions-challenge/scripts/global/continue.zh"
 import "quests/champions-challenge/scripts/global/init.zh"
 
