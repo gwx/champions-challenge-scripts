@@ -1,17 +1,21 @@
 // Get the center coordinates of a box.
 // R[0] - the center x.
 // R[1] - the center y.
-void Box_Center(int box) {Box_Center(box, 0);}
 void Box_Center(int box, int offset) {
 	R[0] = (box[offset + DIR_LEFT] + box[offset + DIR_RIGHT]) / 2;
 	R[1] = (box[offset + DIR_UP] + box[offset + DIR_DOWN]) / 2;}
 
+// Set the center coordinates of a box.
+void Box_Center(int box, int offset, int x, int y) {
+	Box_Center(box, offset);
+	Box_Move(box, offset, x - R[0], y - R[1]);}
+
 // See if two boxes collide.
-bool Box_Collision(int box1, int box2) {
-	return box1[DIR_UP] < box2[DIR_DOWN] + 1
-		&& box2[DIR_UP] < box1[DIR_DOWN] + 1
-		&& box1[DIR_LEFT] < box2[DIR_RIGHT] + 1
-		&& box2[DIR_LEFT] < box1[DIR_RIGHT] + 1;}
+bool Box_Collision(int array1, int offset1, int array2, int offset2) {
+	return array1[offset1 + DIR_UP] < array2[offset2 + DIR_DOWN]
+		&& array2[offset2 + DIR_UP] < array1[offset1 + DIR_DOWN]
+		&& array1[offset1 + DIR_LEFT] < array2[offset2 + DIR_RIGHT]
+		&& array2[offset2 + DIR_LEFT] < array1[offset1 + DIR_RIGHT];}
 
 // Move a bounding box by the given amount.
 void Box_Move(int box, int dx, int dy) {
@@ -26,6 +30,20 @@ void Box_Move(int box, int offset, int dx, int dy) {
 	box[offset + DIR_DOWN] += dy;
 	box[offset + DIR_LEFT] += dx;
 	box[offset + DIR_RIGHT] += dx;}
+
+// Move the box's top-left corner to the set position
+void Box_Put(int box, int offset, int x, int y) {
+	int width = box[DIR_RIGHT] - box[DIR_LEFT];
+	int height = box[DIR_DOWN] - box[DIR_UP];
+	box[DIR_UP] = y;
+	box[DIR_DOWN] = y + height;
+	box[DIR_LEFT] = x;
+	box[DIR_RIGHT] = x + width;}
+
+// Set the size of a box.
+void Box_Size(int box, int offset, int width, int height) {
+	box[offset + DIR_DOWN] = box[offset + DIR_UP] + height - 1;
+	box[offset + DIR_RIGHT] = box[offset + DIR_LEFT] + width - 1;}
 
 // Draw a box to the screen.
 void Box_Draw(int box, int layer, int color, int opacity) {
@@ -46,22 +64,22 @@ void Box_Draw(int box, int offset, int layer, int color, int opacity) {
 // R[1] - the y coordinate
 void Box_Edge(int box, int offset, int dir) {
 	int x = Dir_X(dir);
-	if (-1 == x) {R[0] = box[DIR_LEFT];}
-	else if (1 == x) {R[0] = box[DIR_RIGHT];}
-	else {R[0] = (box[DIR_LEFT] + box[DIR_RIGHT]) / 2;}
+	if (-1 == x) {R[0] = box[offset + DIR_LEFT];}
+	else if (1 == x) {R[0] = box[offset + DIR_RIGHT];}
+	else {R[0] = (box[offset + DIR_LEFT] + box[offset + DIR_RIGHT]) / 2;}
 	int y = Dir_Y(dir);
-	if (-1 == y) {R[1] = box[DIR_UP];}
-	else if (1 == y) {R[1] = box[DIR_DOWN];}
-	else {R[1] = (box[DIR_UP] + box[DIR_DOWN]) / 2;}}
+	if (-1 == y) {R[1] = box[offset + DIR_UP];}
+	else if (1 == y) {R[1] = box[offset + DIR_DOWN];}
+	else {R[1] = (box[offset + DIR_UP] + box[offset + DIR_DOWN]) / 2;}}
 
 // Gets the distance to the next quarter tile border.
-int Box_BorderDistance(int box, int dir) {
+int Box_BorderDistance(int box, int offset, int dir) {
 	// Right and Down
 	if (dir & 1) {
-		int edge = (15 - (box[dir] % 8)) % 8;
+		int edge = (8 - (box[offset + dir] % 8)) % 8;
 		return edge;}
 	// Left and Up
 	else {
-		int edge = box[dir] % 8;
+		int edge = box[offset + dir] % 8;
 		if (edge < 0) {edge += 8;}
 		return edge;}}

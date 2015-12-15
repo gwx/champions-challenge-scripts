@@ -18,3 +18,11 @@ void Array_Copy(int target, int source, int start, int end) {
 void Array_Copy(int target, int target_start, int source, int source_start, int count) {
 	for (int i = 0; i < count; ++i) {
 		target[i + target_start] = source[i + source_start];}}
+
+void Array_Add(int target, int target_start, int source, int source_start, int count) {
+	for (int i = 0; i < count; ++i) {
+		target[i + target_start] += source[i + source_start];}}
+
+void Array_Subtract(int target, int target_start, int source, int source_start, int count) {
+	for (int i = 0; i < count; ++i) {
+		target[i + target_start] -= source[i + source_start];}}

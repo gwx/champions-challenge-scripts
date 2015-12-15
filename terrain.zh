@@ -38,6 +38,38 @@ int Terrain_Line(int x1, int y1, int x2, int y2) {
 
 	return code;}
 
+// See if the terrain blocks a box from moving in a given direction. This
+// checks 0.0001 pixels in front, so it must be right on the border to be
+// effective.
+// box, offset - box array and offset
+// dir - the direction of movement
+// terrain - terrain flags that are needed to be "walkable"
+// return - true if movement is blocked
+bool Terrain_BoxBlock(int box, int offset, int dir, int terrain) {
+	int code = terrain;
+
+	if (dir == DIR_UP || dir == DIR_LEFTUP || dir == DIR_RIGHTUP) {
+		for (int x = box[offset + DIR_LEFT]; x < box[offset + DIR_RIGHT] - 0.0001; x += 8) {
+			code &= Terrain_Location(x, box[offset + DIR_UP] - 0.0001);}
+		code &= Terrain_Location(box[offset + DIR_RIGHT] - 0.0001, box[offset + DIR_UP] - 0.0001);}
+
+	if (dir == DIR_DOWN || dir == DIR_LEFTDOWN || dir == DIR_RIGHTDOWN) {
+		for (int x = box[offset + DIR_LEFT]; x < box[offset + DIR_RIGHT] - 0.0001; x += 8) {
+			code &= Terrain_Location(x, box[offset + DIR_DOWN]);}
+		code &= Terrain_Location(box[offset + DIR_RIGHT] - 0.0001, box[offset + DIR_DOWN]);}
+
+	if (dir == DIR_LEFT || dir == DIR_LEFTUP || dir == DIR_LEFTDOWN) {
+		for (int y = box[offset + DIR_UP]; y < box[offset + DIR_DOWN] - 0.0001; y += 8) {
+			code &= Terrain_Location(box[offset + DIR_LEFT] - 0.0001, y);}
+		code &= Terrain_Location(box[offset + DIR_LEFT] - 0.0001, box[offset + DIR_DOWN] - 0.0001);}
+
+	if (dir == DIR_RIGHT || dir == DIR_RIGHTUP || dir == DIR_RIGHTDOWN) {
+		for (int y = box[offset + DIR_UP]; y < box[offset + DIR_DOWN] - 0.0001; y += 8) {
+			code &= Terrain_Location(box[offset + DIR_RIGHT], y);}
+		code &= Terrain_Location(box[offset + DIR_RIGHT], box[offset + DIR_DOWN] - 0.0001);}
+
+	return code != terrain;}
+
 // Moves a box, sliding around terrain, up until it would hit a new 8x8 quarter tile.
 // box, offset - box array and offset
 // distance - distance to travel.
@@ -140,33 +172,6 @@ int Terrain_BoxStep(int box, int offset, int distance, int angle, int terrain) {
 		// Advance to the next border.
 		Box_Move(box, offset, dx, dy);
 		return Sqrt(dx*dx + dy*dy);}}
-
-// See if the terrain blocks a box from moving in a given direction. This
-// checks 0.0001 pixels in front, so it must be right on the border to be
-// effective.
-// box, offset - box array and offset
-// dir - the direction of movement
-// terrain - terrain flags that are needed to be "walkable"
-// return - true if movement is blocked
-bool Terrain_BoxBlock(int box, int offset, int dir, int terrain) {
-	int code = terrain;
-	if (dir == DIR_UP || dir == DIR_LEFTUP || dir == DIR_RIGHTUP) {
-		for (int x = box[offset + DIR_LEFT]; x < box[offset + DIR_RIGHT] + 0.9999; x += 8) {
-			code &= Terrain_Location(x, box[offset + DIR_UP] - 0.0001);}
-		code &= Terrain_Location(box[offset + DIR_RIGHT] + 0.9999, box[offset + DIR_UP] - 0.0001);}
-	if (dir == DIR_DOWN || dir == DIR_LEFTDOWN || dir == DIR_RIGHTDOWN) {
-		for (int x = box[offset + DIR_LEFT]; x < box[offset + DIR_RIGHT] + 0.9999; x += 8) {
-			code &= Terrain_Location(x, box[offset + DIR_DOWN] + 1);}
-		code &= Terrain_Location(box[offset + DIR_RIGHT] + 0.9999, box[offset + DIR_DOWN] + 1);}
-	if (dir == DIR_LEFT || dir == DIR_LEFTUP || dir == DIR_LEFTDOWN) {
-		for (int y = box[offset + DIR_UP]; y < box[offset + DIR_DOWN] + 0.9999; y += 8) {
-			code &= Terrain_Location(box[offset + DIR_LEFT] - 0.0001, y);}
-		code &= Terrain_Location(box[offset + DIR_LEFT] - 0.0001, box[offset + DIR_DOWN] + 0.9999);}
-	if (dir == DIR_RIGHT || dir == DIR_RIGHTUP || dir == DIR_RIGHTDOWN) {
-		for (int y = box[offset + DIR_UP]; y < box[offset + DIR_DOWN] + 0.9999; y += 8) {
-			code &= Terrain_Location(box[offset + DIR_RIGHT] + 1, y);}
-		code &= Terrain_Location(box[DIR_RIGHT] + 1, box[DIR_DOWN] + 0.9999);}
-	return code != terrain;}
 
 // Moves a box, sliding around terrain, until it runs out of movement or can't
 // move anymore.

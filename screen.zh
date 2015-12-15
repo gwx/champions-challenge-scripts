@@ -1,11 +1,3 @@
-// The last screen we were on.
-int Screen_Previous = -1;
-
-// If the screen has changed this frame.
-bool Screen_Changed = false;
-// If the screen changed last frame.
-bool Screen_ChangedLast = false;
-
 // Get screen id.
 int Screen_Get() {
 	return (Game->GetCurDMap() << 8) + Game->GetCurDMapScreen();}
@@ -13,6 +5,5 @@ int Screen_Get() {
 // Updates variables.
 void Screen_Prepare() {
 	int screen = Screen_Get();
-	Screen_ChangedLast = Screen_Changed;
-	Screen_Changed = screen != Screen_Previous;
-	Screen_Previous = screen;}
+	G[Screen_Changed] = Cond(screen == G[Screen_Previous], 0, 1);
+	G[Screen_Previous] = screen;}

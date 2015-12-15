@@ -6,7 +6,7 @@ void Menu_DrawSub() {
 	int y = -40;
 
 	for (int res = 0; res < RES_COUNT; ++res) {
-		if (0 == Link_MaxResource[res]) {continue;}
+		if (0 == Link_MaxResource(res)) {continue;}
 
 		// Label
 		Screen->DrawTile(7, x, y, RES_TILE_START + RES_TILE_OFFSET * res,
@@ -14,8 +14,8 @@ void Menu_DrawSub() {
 
 		int resX = x + 33;
 		int tile_start = RES_TILE_START + 2 + RES_TILE_OFFSET * res;
-		for (int i = 1; i <= Link_MaxResource[res] / RES_DIVISOR; ++i) {
-			int offset = Clamp(i * RES_DIVISOR - Floor(Link_CurResource[res]), 0, RES_DIVISOR);
+		for (int i = 1; i <= Link_MaxResource(res) / RES_DIVISOR; ++i) {
+			int offset = Clamp(i * RES_DIVISOR - Floor(Link_CurResource(res)), 0, RES_DIVISOR);
 			Screen->FastTile(7, resX, y, tile_start + offset, 6, OP_OPAQUE);
 			resX += RES_TILE_W + 1;}
 

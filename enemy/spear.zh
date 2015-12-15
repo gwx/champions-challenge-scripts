@@ -41,23 +41,24 @@ const int ENEMY_SPEAR_DURATION_PURSUE = 240;
 // Sound for the spear attacking.
 const int ENEMY_SPEAR_ATTACK_SOUND = 30;
 
-ffc script ai_spear {
+ffc script enemy_spear {
 	void run() {
 		int enemy_id = this->InitD[ENEMY_FFCD_ID];
-		int npc_id = Enemy_NpcId(enemy_id);
-		if (-1 == npc_id) {return;}
+		if (-1 == enemy_id) {return;}
 
-		npc o = Npc_Get(npc_id);
+		int screen_index = Npc_ScreenIndex(enemy_id);
+		if (!screen_index) {return;}
+
+		npc o = Screen->LoadNPC(screen_index);
+		lweapon wo;
 		int base_tile = o->OriginalTile;
 
 		// Give default defenses.
-		int damage = Enemy_Defense(enemy_id);
-		Damage_Fill(damage, 5);
+		Damage_Fill(Enemy_Data, Enemy_Defense(enemy_id), 5);
 
 		// Give default attack.
-		damage = Enemy_Attack(enemy_id);
-		Damage_Val(damage, DAMAGE_CRUSH, 10);
-		Damage_Val(damage, DAMAGE_KNOCKBACK, 12);
+		Enemy_Val(enemy_id, ENEMY_ATTACK + DAMAGE_KNOCKBACK, 12);
+		Enemy_Val(enemy_id, ENEMY_ATTACK + DAMAGE_CRUSH, 10);
 
 		// Give detection.
 		Enemy_Sight(enemy_id, 150);
@@ -87,20 +88,15 @@ ffc script ai_spear {
 				ENEMY_SPEAR_DURATION_END_DELAY_MAX);
 
 		while (true) {
-			if (DEBUG_ENEMY == Debug_Mode) {
-				int a[]="[Spear] Enemy Id: "; TraceS(a); Trace(enemy_id);
-				int b[]="  State: "; TraceS(b); Trace(Enemy_State(enemy_id));}
-
-			if (!Enemy_IsAlloc(enemy_id)) {
+			if (Enemy_Life(enemy_id) <= 0) {
 				Weapon_Destroy(weapon_id);
 				return;}
 
-			if (!Npc_Exists(npc_id)) {
-				Weapon_Destroy(weapon_id);
+			if (!o->isValid()) {
 				Enemy_Free(enemy_id);
+				Weapon_Destroy(weapon_id);
 				return;}
 
-			o = Npc_Get(npc_id);
 			int tile = base_tile;
 			tile += o->Dir;
 			int tile_offset = ENEMY_SPEAR_TILE_STAND;
@@ -129,8 +125,9 @@ ffc script ai_spear {
 
 				// We can see link, so try to get close enough to attack.
 				else {
-					int ex = Enemy_CenterX(enemy_id);
-					int ey = Enemy_CenterY(enemy_id);
+					Enemy_Center(enemy_id);
+					int ex = R[0];
+					int ey = R[1];
 					int lx = Enemy_LinkX(enemy_id);
 					int ly = Enemy_LinkY(enemy_id);
 					int dx = lx - ex;
@@ -176,66 +173,42 @@ ffc script ai_spear {
 						phase = ENEMY_SPEAR_ATTACK_PHASE_MAIN;
 						timer = stab_duration;
 						Game->PlaySound(ENEMY_SPEAR_ATTACK_SOUND);
-						eweapon wo = Weapon_CreateEW();
-						weapon_id = Weapon_Id(wo);
-						int damage_id = Weapon_Damage(weapon_id);
-						Damage_Val(damage_id, DAMAGE_PIERCE, o->WeaponDamage);
-						Damage_Val(damage_id, DAMAGE_KNOCKBACK, 10);
-						int dir = Dir_Major(Enemy_LinkX(enemy_id) - Enemy_CenterX(enemy_id),
-																Enemy_LinkY(enemy_id) - Enemy_CenterY(enemy_id));
+						wo = Weapon_Create();
+						weapon_id = R[0];
+						Weapon_HitLink(weapon_id, true);
+						Weapon_Pierce(weapon_id, true);
+						Weapon_Val(weapon_id, WEAPON_DAMAGE + DAMAGE_KNOCKBACK, 10);
+						Weapon_Val(weapon_id, WEAPON_DAMAGE + DAMAGE_PIERCE, o->WeaponDamage);
+						Enemy_Center(enemy_id);
+						int dir = Dir_Major(Enemy_LinkX(enemy_id) - R[0],
+																Enemy_LinkY(enemy_id) - R[1]);
 						o->Dir = dir;
 						wo->Dir = dir;
 						wo->OriginalTile = base_tile + ENEMY_SPEAR_TILE_SPEAR + dir;
 						wo->NumFrames = 1;
-						wo->HitXOffset = 0;
-						wo->HitYOffset = 0;
-						if (DIR_UP == dir) {
-							wo->HitWidth = 8;
-							wo->HitHeight = 24;
-							wo->DrawXOffset = -2;
-							wo->DrawYOffset = 2;}
-						else if (DIR_DOWN == dir) {
-							wo->HitWidth = 8;
-							wo->HitHeight = 24;
-							wo->DrawXOffset = -6;
-							wo->DrawYOffset = 8;}
-						else if (DIR_LEFT == dir) {
-							wo->HitWidth = 24;
-							wo->HitHeight = 8;
-							wo->DrawYOffset = -8;}
-						else if (DIR_RIGHT == dir) {
-							wo->HitWidth = 24;
-							wo->HitHeight = 8;
-							wo->DrawXOffset = 8;
-							wo->DrawYOffset = -8;}
-						// Readjust weapon after we mess with its box.
-						Collision_Adjust(wo);}}
+						wo->DrawXOffset = Dir_X(dir) * 4;
+						wo->DrawYOffset = Dir_Y(dir) * 4;
+						Enemy_Center(enemy_id);}}
 
 				if (ENEMY_SPEAR_ATTACK_PHASE_MAIN == phase) {
 					tile_offset = ENEMY_SPEAR_TILE_STAB;
-					// Ensure weapon still exists.
-					int wo_id = Weapon_ObjectId(weapon_id);
-					if (!EWeapon_Exists(wo_id)) {
+					if (!wo->isValid()) {
 						phase = ENEMY_SPEAR_ATTACK_PHASE_END_DELAY;
 						timer = end_delay;
 						Weapon_Free(weapon_id);
 						weapon_id = -1;}
 					else if (timer > 0) {
-						eweapon wo = EWeapon_Get(wo_id);
 						wo->DeadState = WDS_ALIVE;
 						int dir = o->Dir;
+						Enemy_Center(enemy_id);
 						if (DIR_UP == dir) {
-							wo->X = o->X + 2;
-							wo->Y = o->Y - 12;}
+							Weapon_Bounds(weapon_id, R[1] - 22, R[1] + 2, R[0] - 6, R[0] + 2);}
 						else if (DIR_DOWN == dir) {
-							wo->X = o->X + 6;
-							wo->Y = o->Y + 8;}
+							Weapon_Bounds(weapon_id, R[1] - 2, R[1] + 22, R[0] - 2, R[0] + 6);}
 						else if (DIR_LEFT == dir) {
-							wo->X = o->X - 14;
-							wo->Y = o->Y + 8;}
+							Weapon_Bounds(weapon_id, R[1] - 2, R[1] + 6, R[0] - 22, R[0] + 2);}
 						else if (DIR_RIGHT == dir) {
-							wo->X = o->X + 6;
-							wo->Y = o->Y + 8;}}
+							Weapon_Bounds(weapon_id, R[1] - 2, R[1] + 6, R[0] - 2, R[0] + 22);}}
 					else {
 						Weapon_Destroy(weapon_id);
 						weapon_id = -1;
@@ -253,5 +226,5 @@ ffc script ai_spear {
 				Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_PHASE, phase);
 				Enemy_Val(enemy_id, ENEMY_SPEAR_ATTACK_TIMER, timer);}
 
-			o->OriginalTile = tile + tile_offset;
+			Enemy_Tile(enemy_id, tile + tile_offset);
 			Waitframe();}}}

@@ -5,29 +5,58 @@ int G[200000];  // max 214717
 // Extra return values.
 int R[100];
 
-// eweapon.zh
+// action.zh
 
-const int EWeapon_LastId = 0;
+const int Action_LastId        = 0;
+
+// enemy.zh
+
+const int Enemy_LastId         = 1;
+const int Enemy_ScreenDetected = 2;
+
+// item.zh
+
+const int Item_LastId          = 3;
 
 // link.zh
 
-const int Link_Bounds         = 10;
-const int Link_BoundUp        = 10;
-const int Link_BoundDown      = 11;
-const int Link_BoundLeft      = 12;
-const int Link_BoundRight     = 13;
+const int Link_F1             = 10;
+const int Link_State          = 11;
+const int Link_StateTimer     = 12;
+const int Link_AnimationTimer = 13;
+const int Link_HitTimer       = 14;
 
-const int Link_KnockbackSpeed = 14;
-const int Link_KnockbackAngle = 15;
+const int Link_Bounds         = 20;
+const int Link_BoundUp        = 20;
+const int Link_BoundDown      = 21;
+const int Link_BoundLeft      = 22;
+const int Link_BoundRight     = 23;
 
-// lweapon.zh
+const int Link_KnockbackSpeed = 24;
+const int Link_KnockbackAngle = 25;
 
-const int LWeapon_LastId = 100;
+const int Link_Speed          = 31;
+const int Link_SpeedMods      = 32;
 
-// npc.zh
+const int Link_Attack         = 40;
+const int Link_Defense        = 50;
+const int Link_Shield         = 60;
 
-const int Npc_LastId = 101;
+const int Link_ShieldAngle    = 70;
+const int Link_Class          = 71;
+
+const int Link_Resources      = 80;
+const int Link_MaxResources   = 90;
+
+const int Link_TileBase         = 100;
+const int Link_TileOffset       = 101;
+const int Link_TileMods         = 102;
+
+// screen.zh
+
+const int Screen_Previous = 200;
+const int Screen_Changed  = 201;
 
 // weapon.zh
 
-const int Weapon_LastId = 102;
+const int Weapon_LastId = 300;

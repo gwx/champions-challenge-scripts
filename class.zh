@@ -5,26 +5,26 @@ void Class_Switch() {}
 // Turn on the knight class.
 void Class_KnightOn() {
 	int action;
-	int damage;
 
-	//Link_TileStart = 35630;
-	Link_MaxResource[RES_LIFE] = 3 * RES_DIVISOR;
-	Link_CurResource[RES_LIFE] = 3 * RES_DIVISOR;
-	Link_MaxResource[RES_STAM] = 3 * RES_DIVISOR;
-	Link_CurResource[RES_STAM] = 3 * RES_DIVISOR;
-	Link_Speed = 1.0;
+	G[Link_TileBase] = 35620;
 
-	Damage_Fill(Link_Attack, 0);
-	Damage_Fill(Link_Defense, 0);
-	Damage_Fill(Link_Shield, 0);
+	Link_MaxResource(RES_LIFE, 3 * RES_DIVISOR);
+	Link_CurResource(RES_LIFE, 3 * RES_DIVISOR);
+	Link_MaxResource(RES_STAM, 3 * RES_DIVISOR);
+	Link_CurResource(RES_STAM, 3 * RES_DIVISOR);
+	G[Link_Speed] = 1.0;
 
-	Damage_Val(Link_Attack, DAMAGE_KNOCKBACK, 10);
-	Damage_Val(Link_Attack, DAMAGE_CRUSH, 5);
+	Damage_Fill(G, Link_Attack, 0);
+	Damage_Fill(G, Link_Defense, 0);
+	Damage_Fill(G, Link_Shield, 0);
 
-	Damage_Val(Link_Defense, DAMAGE_KNOCKBACK, 8);
-	Damage_Val(Link_Defense, DAMAGE_SLASH, 8);
-	Damage_Val(Link_Defense, DAMAGE_PIERCE, 8);
-	Damage_Val(Link_Defense, DAMAGE_CRUSH, 8);
+	G[Link_Attack + DAMAGE_KNOCKBACK] = 10;
+	G[Link_Attack + DAMAGE_CRUSH] = 5;
+
+	G[Link_Defense + DAMAGE_KNOCKBACK] = 8;
+	G[Link_Defense + DAMAGE_SLASH] = 8;
+	G[Link_Defense + DAMAGE_PIERCE] = 8;
+	G[Link_Defense + DAMAGE_CRUSH] = 8;
 
 	Action_FreeAll();
 
@@ -33,10 +33,8 @@ void Class_KnightOn() {
 	Action_Trigger(action, TRIGGER_A);
 	Action_Val(action, ACTION_SLASH_TILE, 39062);
 	Action_Val(action, ACTION_SLASH_SOUND, 30);
-	damage = Damage_Alloc();
-	Damage_Val(damage, DAMAGE_KNOCKBACK, 10);
-	Damage_Val(damage, DAMAGE_SLASH, 12);
-	Action_Val(action, ACTION_SLASH_DAMAGE, damage);
+	Action_Val(action, ACTION_SLASH_DAMAGE + DAMAGE_KNOCKBACK, 10);
+	Action_Val(action, ACTION_SLASH_DAMAGE + DAMAGE_SLASH, 12);
 	Action_Val(action, ACTION_SLASH_DURATION_START_DELAY, 2);
 	Action_Val(action, ACTION_SLASH_DURATION_SLASH_1,     5);
 	Action_Val(action, ACTION_SLASH_DURATION_SLASH_2,     5);
@@ -50,11 +48,10 @@ void Class_KnightOn() {
 	Action_Trigger(action, TRIGGER_B);
 	Action_Val(action, ACTION_SHIELD_TILE_OFFSET, 6);
 	Action_Val(action, ACTION_SHIELD_SOUND, 1);
-	damage = Damage_Alloc();
-	Damage_Val(damage, DAMAGE_SLASH, 5);
-	Damage_Val(damage, DAMAGE_PIERCE, 5);
-	Damage_Val(damage, DAMAGE_CRUSH, 5);
-	Action_Val(action, ACTION_SHIELD_DEFENSE, damage);
+	Action_Val(action, ACTION_SHIELD_DEFENSE + DAMAGE_SLASH, 5);
+	Action_Val(action, ACTION_SHIELD_DEFENSE + DAMAGE_PIERCE, 5);
+	Action_Val(action, ACTION_SHIELD_DEFENSE + DAMAGE_CRUSH, 5);
+	Action_Val(action, ACTION_SHIELD_ANGLE, 150);
 	Action_Val(action, ACTION_SHIELD_DURATION_START_DELAY, 4);
 	Action_Val(action, ACTION_SHIELD_DURATION_END_DELAY, 4);
 	Action_Val(action, ACTION_SHIELD_SPEED_MOD, 0.6);

@@ -6,8 +6,6 @@ const int ACTION_SHIELD = 3;
 const int ACTION_SHIELD_TILE_OFFSET = 3;
 // Index for the start sound to play.
 const int ACTION_SHIELD_SOUND = 4;
-// Index for the defense damage.
-const int ACTION_SHIELD_DEFENSE = 5;
 // Index for the duration of the startup delay.
 const int ACTION_SHIELD_DURATION_START_DELAY = 6;
 // Index for the duration of the end delay.
@@ -25,6 +23,11 @@ const int ACTION_SHIELD_PHASE = 11;
 // Index for the time left in this phase.
 const int ACTION_SHIELD_TIMER = 12;
 
+// Index for the defense damage.
+const int ACTION_SHIELD_DEFENSE = 13; // .. 16
+// Index for the shield angle.
+const int ACTION_SHIELD_ANGLE = 20;
+
 //// Phases
 // Default phase.
 const int ACTION_SHIELD_PHASE_INIT = 0;
@@ -40,7 +43,7 @@ bool Action_Shield_Possible(int id) {
 	int res = Action_Val(id, ACTION_SHIELD_RESOURCE);
 	if (RES_NONE != res) {
 		int cost = Action_Val(id, ACTION_SHIELD_RESOURCE_COST);
-		if (Link_CurResource[res] < cost) {
+		if (Link_CurResource(res) < cost) {
 			return false;}}
 	return true;}
 
@@ -52,43 +55,42 @@ void Action_Shield(int id) {
 
 	if (timer > 0) {--timer;}
 
-	if (DEBUG_ACTION == Debug_Mode) {
-		int a[]="  Type: Shield"; TraceS(a); TraceNL();
-		int b[]="  Phase: "; TraceS(b); Trace(phase);
-		int c[]="  Timer: "; TraceS(c); Trace(timer);}
-
 	if (ACTION_SHIELD_PHASE_INIT == phase) {
 		phase = ACTION_SHIELD_PHASE_START_DELAY;
 		timer = Action_Val(id, ACTION_SHIELD_DURATION_START_DELAY);}
 
 	if (ACTION_SHIELD_PHASE_START_DELAY == phase) {
 		if (timer > 0) {
-			Link_NoMove(true);
-			Link_NoAct(true);}
+			Link_CanMove(false);
+			Link_CanAct(false);
+			Link_HasActed(true);}
 		else {
 			phase = ACTION_SHIELD_PHASE_MAIN;
 			timer = -1;
 
 			Game->PlaySound(Action_Val(id, ACTION_SHIELD_SOUND));
-			Link_TileOffsetMod += Action_Val(id, ACTION_SHIELD_TILE_OFFSET);
-			Link_SpeedMod *= Action_Val(id, ACTION_SHIELD_SPEED_MOD);
-			Damage_Add(Link_Shield, Action_Val(id, ACTION_SHIELD_DEFENSE));}}
+			G[Link_TileMods] += Action_Val(id, ACTION_SHIELD_TILE_OFFSET);
+			G[Link_SpeedMods] *= Action_Val(id, ACTION_SHIELD_SPEED_MOD);
+			G[Link_ShieldAngle] = Action_Val(id, ACTION_SHIELD_ANGLE);
+			Damage_Add(G, Link_Shield, Action_Data, id * ACTION_DATA_SIZE + ACTION_SHIELD_DEFENSE);}}
 
 	if (ACTION_SHIELD_PHASE_MAIN == phase) {
 		int res = Action_Val(id, ACTION_SHIELD_RESOURCE);
-		Link_ResourceAdd(res, -Action_Val(id, ACTION_SHIELD_RESOURCE_COST));
-		if (!Action_Held(id) || !Link_HasResource(res)) {
+		Link_CurResourceAdd(res, -Action_Val(id, ACTION_SHIELD_RESOURCE_COST));
+		if (!Action_Held(id) || Link_CurResource(res) <= 0) {
 			phase = ACTION_SHIELD_PHASE_END_DELAY;
 			timer = Action_Val(id, ACTION_SHIELD_DURATION_END_DELAY);
 
-			Link_TileOffsetMod -= Action_Val(id, ACTION_SHIELD_TILE_OFFSET);
-			Link_SpeedMod /= Action_Val(id, ACTION_SHIELD_SPEED_MOD);
-			Damage_Subtract(Link_Shield, Action_Val(id, ACTION_SHIELD_DEFENSE));}}
+			G[Link_TileMods] -= Action_Val(id, ACTION_SHIELD_TILE_OFFSET);
+			G[Link_SpeedMods] /= Action_Val(id, ACTION_SHIELD_SPEED_MOD);
+			G[Link_ShieldAngle] = 0;
+			Damage_Subtract(G, Link_Shield, Action_Data, id * ACTION_DATA_SIZE + ACTION_SHIELD_DEFENSE);}}
 
 	if (ACTION_SHIELD_PHASE_END_DELAY == phase) {
 		if (timer > 0) {
-			Link_NoMove(true);
-			Link_NoAct(true);}
+			Link_CanMove(false);
+			Link_CanAct(false);
+			Link_HasActed(true);}
 		else {
 			phase = ACTION_SHIELD_PHASE_INIT;
 			Action_Active(id, false);}}

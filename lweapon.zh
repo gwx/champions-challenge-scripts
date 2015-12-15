@@ -1,43 +1,58 @@
 ////////////////////////////////////////////////////////////////
-// Lweapon Object Flags
+// LWeapon->Misc Indices
 
-// Misc index for the lweapon's consistent id.
 const int LWEAPON_MISC_ID = 0;
 
 ////////////////////////////////////////////////////////////////
-// Management
+// LWeapon Accessors.
 
-// Maximum number of lweapons.
-const int LWEAPON_MAX = 255;
+// If the lweapon is being used as a weapon.
+bool LWeapon_IsWeapon(lweapon o) {
+	return WEAPON_OBJECT_TYPE == o->ID;}
 
-// See if an lweapon exists.
-bool LWeapon_Exists(lweapon lweapons, int id) {
-	lweapon o = lweapons[id];
-	return o->isValid();}
-
-// Get the id of an lweapon.
+// Get the lweapon's weapon id.
 int LWeapon_Id(lweapon o) {
 	return o->Misc[LWEAPON_MISC_ID] - 1;}
-// Set the id of an lweapon.
-void LWeapon_Id(lweapon lweapons, lweapon o, int id) {
-	o->Misc[LWEAPON_MISC_ID] = id + 1;
-	lweapons[id] = o;}
 
-// Assign a new lweapon its id.
-int LWeapon_AssignId(lweapon lweapons, lweapon o) {
-	int id = LWeapon_Id(o);
-	if (-1 != id) {return id;}
-	for (id = (G[LWeapon_LastId] + 1) % LWEAPON_MAX;
-			 id != G[LWeapon_LastId];
-			 id = (id + 1) % LWEAPON_MAX) {
-		lweapon o2 = lweapons[id];
-		if (!o2->isValid()) {
-			LWeapon_Id(o, id);
-			G[LWeapon_LastId] = id;
-			lweapons[id] = o;
-			return id;}}
-	LWeapon_AssignId_Message1();
-	return -1;}
-void LWeapon_AssignId_Message1() {
-	int a[]="ERROR: Could not assign lweapon id.";
-	TraceS(a); TraceNL();}
+// Set the lweapon's weapon id.
+void LWeapon_Id(lweapon o, int id) {
+	o->Misc[LWEAPON_MISC_ID] = id + 1;}
+
+////////////////////////////////////////////////////////////////
+// Lookup
+
+// Holds the last seen screen index for all lweapons.
+int LWeapon_LastScreenIndex[255];
+
+// Get the screen index of the lweapon with the given id. If there is none,
+// return 0.
+int LWeapon_ScreenIndex(int id) {
+	int index;
+	int actual_id;
+	lweapon o;
+
+	// First, try the saved screen index.
+	index = LWeapon_LastScreenIndex[id];
+	if (1 <= index && index <= Screen->NumLWeapons()) {
+		o = Screen->LoadLWeapon(index);
+		// Check to make sure it actually is the one we want.
+		actual_id = LWeapon_Id(o);
+		if (actual_id == id) {
+			return index;}
+		// If it's not the one we want, update the index we just learned about.
+		else {
+			LWeapon_LastScreenIndex[id] = 0;}}
+
+	// We don't know where it is, so loop through on-screen objects until we
+	// find it.
+	for (index = 1; index <= Screen->NumLWeapons(); ++index) {
+		// Grab the id.
+		o = Screen->LoadLWeapon(index);
+		actual_id = LWeapon_Id(o);
+		// Update the indices.
+		LWeapon_LastScreenIndex[actual_id] = index;
+		// If it's correct, return the index.
+		if (actual_id == id) {return index;}}
+
+	// We couldn't find the lweapon.
+	return 0;}

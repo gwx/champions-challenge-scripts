@@ -1,6 +1,5 @@
 global script Continue {
 	void run() {
 		Enemy_Continue();
-		Weapon_Continue();
 		Link_Continue();
 	}}

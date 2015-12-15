@@ -1,0 +1,24 @@
+global script active {
+	void run() {
+		while (true) {
+			// Preparation Section.
+			Screen_Prepare();
+			Input_Prepare();
+
+			// Detection Section.
+			Enemy_Detect();
+
+      // Update Section.
+			Item_Update();
+			Link_Update();
+			Enemy_Update();
+			Weapon_Update();
+			Debug_Update();
+
+			Waitdraw();
+
+			// Draw Section.
+			Link_Draw();
+			Menu_DrawSub();
+
+			Waitframe();}}}

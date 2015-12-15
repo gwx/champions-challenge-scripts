@@ -4,9 +4,9 @@
 // Maximum number of actions.
 const int ACTION_DATA_COUNT = 10;
 // Space allocated for each action.
-const int ACTION_DATA_SIZE = 20;
+const int ACTION_DATA_SIZE = 50;
 // All action data.
-int Action_Data[200];
+int Action_Data[500];
 
 // Index for the type of action. This determines what piece of code is run
 // when the action is performed.
@@ -55,22 +55,27 @@ bool Action_ValidId(int id) {
 bool Action_IsAlloc(int id) {
 	return Action_Flag(id, ACTION_F1, ACTION_F1_ALLOC);}
 
-int Action_LastId = -1;
 // Find an unused action id, mark it as used and return it.
 int Action_Alloc() {
-	int id = (Action_LastId + 1) % ACTION_DATA_COUNT;
-	while (id != Action_LastId) {
-		if (!Action_IsAlloc(id)) {
-			Action_LastId = id;
-			// Initialize action to the defalut values.
-			Array_Fill(Action_Data, 0, id * ACTION_DATA_SIZE, (id + 1) * ACTION_DATA_SIZE);
-			Action_Flag(id, ACTION_F1, ACTION_F1_ALLOC, true);
+	int id = G[Action_LastId];
+	for (id = (id + 1) % ACTION_DATA_COUNT;
+			 id != G[Action_LastId];
+			 id = (id + 1) % ACTION_DATA_COUNT) {
+		if (!Action_IsAlloc(id)) {break;}}
 
-			return id;}
-		id = (id + 1) % ACTION_DATA_COUNT;}
+	if (G[Action_LastId] == id) {
+		Action_Alloc_MSG_1();
+		return -1;}
 
-	int a[]="ERROR: Out of action slots. Suspected memory leak."; TraceS(a); TraceNL();
-	return -1;}
+	G[Action_LastId] = id;
+
+	// Initialize action to the defalut values.
+	Array_Fill(Action_Data, 0, id * ACTION_DATA_SIZE, (id + 1) * ACTION_DATA_SIZE);
+	Action_Flag(id, ACTION_F1, ACTION_F1_ALLOC, true);
+
+	return id;}
+void Action_Alloc_MSG_1() {
+	int a[]="ERROR: Out of action slots. Suspected memory leak."; TraceS(a); TraceNL();}
 
 // Free an action slot.
 void Action_Free(int id) {

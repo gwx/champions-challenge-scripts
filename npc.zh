@@ -1,59 +1,58 @@
 ////////////////////////////////////////////////////////////////
-// Npc Object Flags
+// Npc->Misc Indices
 
-// Misc index for the NPC's consistent id.
 const int NPC_MISC_ID = 0;
 
-// Misc index for the NPC's type
-const int NPC_MISC_TYPE = 1;
-// Enemy type.
-const int NPC_MISC_TYPE_ENEMY = 1;
+////////////////////////////////////////////////////////////////
+// Npc->Attribute Indices
+
+const int NPC_ATTR_SCRIPT = 11;
 
 ////////////////////////////////////////////////////////////////
-// Management
+// Npc Accessors.
 
-const int NPC_MAX = 255;
+// If the given npc is an enemy.
+bool Npc_IsEnemy(npc o) {return true;}
 
-// See if an npc exists.
-bool Npc_Exists(npc npcs, int id) {
-	npc o = npcs[id];
-	return o->isValid();}
-
-// Get the id of an npc.
+// Get the enemy id for a given npc.
 int Npc_Id(npc o) {
 	return o->Misc[NPC_MISC_ID] - 1;}
-// Set the id of an npc.
-int Npc_Id(npc npcs, npc o, int id) {
-	o->Misc[NPC_MISC_ID] = id + 1;
-	npcs[id] = o;}
 
-// Assign a new npc its id.
-int Npc_AssignId(npc npcs, npc o) {
-	int id = Npc_Id(o);
-	if (-1 != id) {return id;}
-	for (int id = (G[Npc_LastId] + 1) % NPC_MAX;
-			 id != G[Npc_LastId];
-			 id = (id + 1) % NPC_MAX) {
-		npc o2 = npcs[id];
-		if (!o2->isValid()) {
-			o->Misc[NPC_MISC_ID] = id + 1;
-			G[Npc_LastId] = id;
-			npcs[id] = o;
-			return id;}}
-	Npc_AssignId_Message1();
-	return -1;}
-void Npc_AssignId_Message1() {
-	int a[]="ERROR: Could not assign npc id.";
-	TraceS(a); TraceNL();}
+// Set the enemy id for a given npc.
+void Npc_Id(npc o, int id) {
+	o->Misc[NPC_MISC_ID] = id + 1;}
 
-// Create a new npc.
-// R[0] - the id of the npc.
-const int NPC_CREATE_R_ID = 0;
-npc Npc_Create(int type) {
-	npc o = Screen->CreateNPC(type);
-	R[NPC_CREATE_R_ID] = Npc_AssignId(o);
-	return o;}
+////////////////////////////////////////////////////////////////
+// Lookup
 
-// If an npc is an enemy.
-bool Npc_IsEnemy(npc o) {
-	return NPC_MISC_TYPE_ENEMY == o->Misc[NPC_MISC_TYPE];}
+// Holds the last seen screen index for all npcs.
+int Npc_LastScreenIndex[255];
+
+// Get the screen index of the npc with the given id. If there is none, return
+// 0.
+int Npc_ScreenIndex(int id) {
+	// First, try the saved screen index.
+	int index = Npc_LastScreenIndex[id];
+	if (1 <= index && index <= Screen->NumNPCs()) {
+		npc o = Screen->LoadNPC(index);
+		// Check to make sure it actually is the one we want.
+		int actual_id = Npc_Id(o);
+		if (actual_id == id) {
+			return index;}
+		// If it's not the one we want, update the indices we just learned about.
+		else {
+			Npc_LastScreenIndex[id] = 0;}}
+
+	// We don't know where it is, so loop through on-screen objects until we
+	// find it.
+	for (int index = 1; index <= Screen->NumNPCs(); ++index) {
+		// Grab the id.
+		npc o = Screen->LoadNPC(index);
+		int actual_id = Npc_Id(o);
+		// Update the indices.
+		Npc_LastScreenIndex[actual_id] = index;
+		// If it's correct, return the index.
+		if (actual_id == id) {return index;}}
+
+	// We couldn't find the npc.
+	return 0;}

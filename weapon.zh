@@ -1,40 +1,48 @@
-// Object type used for created weapons.
+////////////////////////////////////////////////////////////////
+// Weapons
+// They'll be used to damage both link and enemies.
+// They're backed by lweapons.
+
+// Object id used for created weapons.
 const int WEAPON_OBJECT_TYPE = 31;
 
 ////////////////////////////////////////////////////////////////
 // Data Array
 
 // Maximum number of weapons.
-const int WEAPON_DATA_COUNT = 510;
+const int WEAPON_DATA_COUNT = 255;
 // Space allocated for each weapon.
 const int WEAPON_DATA_SIZE = 20;
 // All weapon data.
-int Weapon_Data[10200]; // size is previous two multiplied
+int Weapon_Data[5100]; // size is previous two multiplied
 
 //// First flag group.
 const int WEAPON_F1 = 0;
 // If this weapon slot has been allocated.
-const int WEAPON_F1_ALLOC     = 0001b;
+const int WEAPON_F1_ALLOC     = 000001b;
 // Set if the weapon can hurt link
-const int WEAPON_F1_HIT_LINK  = 0010b;
+const int WEAPON_F1_HIT_LINK  = 000010b;
 // Set if the weapon can hurt enemies
-const int WEAPON_F1_HIT_ENEMY = 0100b;
+const int WEAPON_F1_HIT_ENEMY = 000100b;
+// If the weapon pierces.
+const int WEAPON_F1_PIERCE    = 001000b;
 // If the weapon can cut grass.
-const int WEAPON_F1_CUT       = 1000b;
+const int WEAPON_F1_CUT       = 010000b;
+// If the weapon can pickup items.
+const int WEAPON_F1_PICKUP    = 100000b;
 
-// Index for the id of the weapon's corresponding object.
-// If it uses an eweapon, add LWEAPON_MAX to it.
-const int WEAPON_OBJECT_ID = 1;
-
-// Index for weapon damage.
-const int WEAPON_DAMAGE = 2;
+// Index for the weapon's valid terrain flags.
+const int WEAPON_TERRAIN     =  1;
 
 // Indices for the weapon's position
-const int WEAPON_BOUNDS = 3;
-const int WEAPON_BOUND_UP = 3;
-const int WEAPON_BOUND_DOWN = 4;
-const int WEAPON_BOUND_LEFT = 5;
-const int WEAPON_BOUND_RIGHT = 6;
+const int WEAPON_BOUNDS      =  4;
+const int WEAPON_BOUND_UP    =  4;
+const int WEAPON_BOUND_DOWN  =  5;
+const int WEAPON_BOUND_LEFT  =  6;
+const int WEAPON_BOUND_RIGHT =  7;
+
+// Index for weapon damage.
+const int WEAPON_DAMAGE      = 10; // .. 13
 
 ////////////////////////////////////////////////////////////////
 // Basic Accessors
@@ -61,118 +69,154 @@ void Weapon_Flag(int id, int index, int key, bool value) {
 bool Weapon_ValidId(int id) {
 	return 0 <= id && id < WEAPON_DATA_COUNT;}
 
-// If a given weapon id already exists.
-bool Weapon_Exists(lweapon lweapons, eweapon eweapons, int id) {
-	if (id < LWEAPON_MAX) {return LWeapon_Exists(lweapons, id);}
-	return EWeapon_Exists(eweapons, id - LWEAPON_MAX);}
+// Creates a new weapon.
+// return - the created lweapon
+// R[0] - the lweapon's id
+lweapon Weapon_Create() {
+	// Create the weapon.
+	lweapon o = Screen->CreateLWeapon(WEAPON_OBJECT_TYPE);
 
-bool Weapon_IsLW(int id) {
-	return id < LWEAPON_MAX;}
+	// If it isn't valid, we're at our limit and failed.
+	if (!o->isValid()) {
+		Weapon_Create_MSG_1();
+		R[0] = -1;
+		return o;}
 
-bool Weapon_IsEW(int id) {
-	return id >= LWEAPON_MAX;}
-
-// Creates a weapon. Returns the id.
-int Weapon_Create(lweapon lws, eweapon ews) {
-	int id;
-	bool found = false;
-	for (id = (G[Weapon_LastId] + 1) % WEAPON_DATA_COUNT;
+	// Find an unused weapon id.
+	int id = G[Weapon_LastId];
+	for (id = (id + 1) % WEAPON_DATA_COUNT;
 			 id != G[Weapon_LastId];
 			 id = (id + 1) % WEAPON_DATA_COUNT) {
-		if (Weapon_Exists(lws, ews, id)) {continue;}
-		// If it's previously allocated, wipe it clean.
-		if (Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC)) {
-			Array_Fill(Weapon_Data, 0, id * WEAPON_DATA_SIZE, (id + 1) * WEAPON_DATA_SIZE);}
-		// Mark as allocated.
-		Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC, true);
-		// Save the last weapon id.
-		G[Weapon_LastId] = id;
-		found = true;
-		break;}
+		// Check all existing weapons for an id overlap. Since we're keeping track
+		// of the starting id, this should only be run through once most of the
+		// time.
+		bool id_free = true;
+		for (int i = 1; i <= Screen->NumLWeapons(); ++i) {
+			lweapon other_o = Screen->LoadLWeapon(i);
+			int other_id = LWeapon_Id(other_o);
+			if (id == other_id) {
+				id_free = false;
+				break;}}
+		if (id_free) {break;}}
 
-	if (!found) {
-		Weapon_Create_Message1();
-		return -1;}
+	// We couldn't find an unused id, so die.
+	if (G[Weapon_LastId] == id) {
+		Weapon_Create_MSG_2();
+		R[0] = -1;
+		return o;}
 
-	// Actually create the weapon.
-	if (id < LWEAPON_MAX) {
-		lweapon o = Screen->CreateLWeapon(WEAPON_OBJECT_TYPE);
-		LWeapon_Id(lws, o, id);
-		o->NumFrames = 1;}
-	else {
-		eweapon o = Screen->CreateEWeapon(WEAPON_OBJECT_TYPE);
-		EWeapon_Id(ews, o, id);
-		o->NumFrames = 1;}
+	// Set the id.
+	LWeapon_Id(o, id);
+	R[0] = id;
 
-	return id;}
+	// Default weapon settings.
+	o->CollDetection = false;
+	o->NumFrames = 1;
+	o->DrawYOffset = 0;
 
-void Weapon_Create_Message1() {
-	int a[]="ERROR: Weapon_Create: Out of weapon slots.";
+	// Cleanup the old weapon data if needed. It shouldn't be needed, though.
+	Weapon_Free(id);
+
+	// Mark the weapon slot as in use.
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC, true);
+
+	return o;}
+void Weapon_Create_MSG_1() {
+	int a[]="ERROR: [Weapon_Create] Out of lweapons.";
 	TraceS(a); TraceNL();}
+void Weapon_Create_MSG_2() {
+	int a[]="ERROR: [Weapon_Create] Out of weapon ids.";
+	TraceS(a); TraceNL();}
+
+// Frees a weapon id.
+void Weapon_Free(int id) {
+	if (!Weapon_ValidId(id)) {return;}
+	if (!Weapon_Flag(id, WEAPON_F1, WEAPON_F1_ALLOC)) {return;}
+	Array_Fill(Weapon_Data, 0, id * WEAPON_DATA_SIZE, (id + 1) * WEAPON_DATA_SIZE);}
+
+// Frees all weapon ids.
+void Weapon_FreeAll() {
+	for (int id = 0; id < WEAPON_DATA_COUNT; ++id) {
+		Weapon_Free(id);}}
+
+// Destroys a weapon and frees its data.
+void Weapon_Destroy(lweapon o) {
+	if (!o->isValid()) {return;}
+	Weapon_Free(LWeapon_Id(o));
+	Remove(o);}
+void Weapon_Destroy(int id) {
+	if (!Weapon_ValidId(id)) {return;}
+	Weapon_Free(id);
+	int index = LWeapon_ScreenIndex(id);
+	if (index) {
+		Remove(Screen->LoadLWeapon(index));}}
 
 ////////////////////////////////////////////////////////////////
 // Accessors
 
-// Get the object id for a weapon.
-int Weapon_ObjectId(int id) {
-	int object_id = Weapon_Val(id, WEAPON_OBJECT_ID);
-	if (object_id >= LWEAPON_MAX) {object_id -= LWEAPON_MAX;}
-	return object_id;}
-
 bool Weapon_HitLink(int id) {
 	return Weapon_Flag(id, WEAPON_F1, WEAPON_F1_HIT_LINK);}
+void Weapon_HitLink(int id, bool value) {
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_HIT_LINK, value);}
 
 bool Weapon_HitEnemy(int id) {
 	return Weapon_Flag(id, WEAPON_F1, WEAPON_F1_HIT_ENEMY);}
+void Weapon_HitEnemy(int id, bool value) {
+	Weapon_Flag(id, WEAPON_F1, WEAPON_F1_HIT_ENEMY, value);}
+
+bool Weapon_Pierce(int id) {
+	return Weapon_Flag(id, WEAPON_F1, WEAPON_F1_PIERCE);}
+void Weapon_Pierce(int id, bool value) {
+	Weapon_Flag(id ,WEAPON_F1, WEAPON_F1_PIERCE, value);}
+bool Weapon_Cut(int id) {
+	return Weapon_Flag(id, WEAPON_F1, WEAPON_F1_CUT);}
+void Weapon_Cut(int id, bool value) {
+	Weapon_Flag(id ,WEAPON_F1, WEAPON_F1_CUT, value);}
+bool Weapon_Pickup(int id) {
+	return Weapon_Flag(id, WEAPON_F1, WEAPON_F1_PICKUP);}
+void Weapon_Pickup(int id, bool value) {
+	Weapon_Flag(id ,WEAPON_F1, WEAPON_F1_PICKUP, value);}
 
 // Get the bounding box offset for the weapon.
 int Weapon_Bounds(int id) {
 	return WEAPON_DATA_SIZE * id + WEAPON_BOUNDS;}
 
+// Set the bounding box for a weapon.
+int Weapon_Bounds(int id, int up, int down, int left, int right) {
+	Weapon_Val(id, WEAPON_BOUND_UP, up);
+	Weapon_Val(id, WEAPON_BOUND_DOWN, down);
+	Weapon_Val(id, WEAPON_BOUND_LEFT, left);
+	Weapon_Val(id, WEAPON_BOUND_RIGHT, right);}
+
+// Set the upper-left corner of the weapon.
+void Weapon_Put(int id, int x, int y) {
+	Box_Put(Weapon_Data, Weapon_Bounds(id), x, y);}
+
+// Get the weapon's center.
+void Weapon_Center(int id) {
+	Box_Center(Weapon_Data, Weapon_Bounds(id));}
+
+// Center the weapon at the given location.
+void Weapon_Center(int id, int x, int y) {
+	Box_Center(Weapon_Data, Weapon_Bounds(id), x, y);}
+
+// Set the size for a weapon.
 void Weapon_Size(int id, int width, int height) {
+	Box_Size(Weapon_Data, Weapon_Bounds(id), width, height);}
 
-}
+int Weapon_Terrain(int id) {return Weapon_Val(id, WEAPON_TERRAIN);}
+void Weapon_Terrain(int id, int value) {Weapon_Val(id, WEAPON_TERRAIN, value);}
 
-int Weapon_Damage(int slot) {return Weapon_Val(slot, WEAPON_DAMAGE);}
-void Weapon_Damage(int slot, int value) {Weapon_Val(slot, WEAPON_DAMAGE, value);}
+int Weapon_Damage(int id) {
+	return WEAPON_DATA_SIZE * id + WEAPON_DAMAGE;}
 
-int Weapon_Dir(lweapon lws, eweapon ews, int id) {
-	if (Weapon_IsLW(id)) {
-		lweapon o = Weapon_LWeapon(lws, id);
-		return o->Dir;}
-	if (Weapon_IsEW(id)) {
-		eweapon o = Weapon_EWeapon(ews, id);
-		return o->Dir;}}
-
-int Weapon_Tile(lweapon lws, eweapon ews, int id) {
-	if (Weapon_IsLW(id)) {
-		lweapon o = Weapon_LWeapon(lws, id);
-		return o->OriginalTile;}
-	if (Weapon_IsEW(id)) {
-		eweapon o = Weapon_EWeapon(ews, id);
-		return o->OriginalTile;}}
-
-void Weapon_Tile(lweapon lws, eweapon ews, int id, int tile) {
-	if (Weapon_IsLW(id)) {
-		lweapon o = Weapon_LWeapon(lws, id);
-		o->OriginalTile = tile;}
-	if (Weapon_IsEW(id)) {
-		eweapon o = Weapon_EWeapon(ews, id);
-		o->OriginalTile = tile;}}
-
-// Get the source coordinates for a weapon.
-// R[0] - the x position
-// R[1] - the y position
-void Weapon_SourceCoords(int id) {
-	Weapon_SourceCoords(id, R);}
-void Weapon_SourceCoords(int id, int returns) {
-	// Get the edge towards the source.
-	int dir = Weapon_Dir(id);
-	if (Dir_Valid(dir)) {dir = OppositeDir(dir);}
-	else {dir = -1;}
-
-	int box[4];
-	Box_Edge(Weapon_Data, Weapon_Bounds(id), dir, returns);}
+// Weapon's center for collision purposes.
+void Weapon_CollisionCoords(int id) {
+	int index = LWeapon_ScreenIndex(id);
+	lweapon o = Screen->LoadLWeapon(index);
+	Weapon_CollisionCoords(o, id);}
+void Weapon_CollisionCoords(lweapon object, int id) {
+	Box_Edge(Weapon_Data, Weapon_Bounds(id), OppositeDir(object->Dir));}
 
 ////////////////////////////////////////////////////////////////
 // Object Interface
@@ -181,44 +225,92 @@ void Weapon_SourceCoords(int id, int returns) {
 bool Weapon_IsWeapon(lweapon o) {
 	return WEAPON_OBJECT_TYPE == o->ID;}
 
-// If a given eweapon object is an actual weapon.
-bool Weapon_IsWeapon(eweapon o) {
-	return WEAPON_OBJECT_TYPE == o->ID;}
-
-// Get the weapon id of an lweapon.
-int Weapon_Id(lweapon o) {
-	return LWeapon_Id(o);}
-
-// Get the weapon id of an eweapon.
-int Weapon_Id(eweapon o) {
-	return EWeapon_Id(o) + LWEAPON_MAX;}
-
-// Get the lweapon for an id.
-lweapon Weapon_LWeapon(lweapon lweapons, int id) {
-	return lweapons[id];}
-
-// Get the eweapon for an id.
-eweapon Weapon_EWeapon(eweapon eweapons, int id) {
-	return eweapons[id - LWEAPON_MAX];}
-
 ////////////////////////////////////////////////////////////////
 // Active Script Calls
 
 // Run through each weapon, checking for collisions.
 void Weapon_Update() {
+	if (G[Screen_Changed]) {Weapon_FreeAll();}
+
 	for (int i = 1; i <= Screen->NumLWeapons(); ++i) {
 		lweapon o = Screen->LoadLWeapon(i);
 		if (!Weapon_IsWeapon(o)) {continue;}
-		Weapon_Update(Weapon_Id(o));}
-	for (int i = 1; i <= Screen->NumEWeapons(); ++i) {
-		eweapon o = Screen->LoadEWeapon(i);
-		if (!Weapon_IsWeapon(o)) {continue;}
-		Weapon_Update(Weapon_Id(o));}}
+		Weapon_Update(o, LWeapon_Id(o));}}
 
 // Check an individual weapon for collisions.
-void Weapon_Update(int id) {
+void Weapon_Update(lweapon object, int id) {
+	int speed;
+	int terrain;
+	int source_x;
+	int source_y;
+	int index;
+	int enemy_id;
+	int damage_index;
+	npc o;
+	item i;
+
+	// Update weapon position.
+	if (object->Step != 0) {
+		speed = object->Step * 0.01;
+		Box_Move(Weapon_Data, Weapon_Bounds(id),
+						 Dir_X(object->Dir) * speed,
+						 Dir_Y(object->Dir) * speed);}
+
+	// Update object position.
+	Weapon_Center(id);
+	object->X = R[0] - 8;
+	object->Y = R[1] - 8;
+
+	// Destroy if invalid terrain.
+	terrain = Weapon_Terrain(id);
+	if (terrain != (terrain & Terrain_Location(R[0], R[1]))) {
+		Weapon_Destroy(object);
+		return;}
+
+	// Slash terrain
+	if (Weapon_Cut(id)) {
+		Weapon_Center(id);
+		Combo_Slash(R[0], R[1]);}
+
+	// Pickup items.
+	if (Weapon_Pickup(id)) {
+		for (index = 1; index <= Screen->NumItems(); ++index) {
+			i = Screen->LoadItem(index);
+			if (!Item_CanPickup(i)) {continue;}
+			Weapon_Center(id);
+			if (i->X <= R[0] && R[0] < i->X + 16
+					&& i->Y <= R[1] && R[1] < i->Y + 16) {
+				i->X = G[Link_BoundLeft];
+				i->Y = G[Link_BoundUp];}}}
+
+	// Grab collision data.
+	Weapon_CollisionCoords(object, id);
+	source_x = R[0];
+	source_y = R[1];
+	damage_index = Weapon_Damage(id);
+
+	// Collide against link?
 	if (Weapon_HitLink(id)) {
-	}
+		if (G[Link_HitTimer] <= 0
+				&& Box_Collision(G, Link_Bounds, Weapon_Data, Weapon_Bounds(id))) {
+			Link_TakeHit(Weapon_Data, damage_index, source_x, source_y);
+			if (!Weapon_Pierce(id)) {
+				Weapon_Destroy(object);
+				return;}}}
+
+	// Collide against enemies?
 	if (Weapon_HitEnemy(id)) {
-	}
-}
+		for (index = 1; index <= Screen->NumNPCs(); ++index) {
+			o = Screen->LoadNPC(index);
+			enemy_id = Npc_Id(o);
+			if (Enemy_HitTimer(enemy_id)) {continue;}
+			if (!Box_Collision(Enemy_Data, Enemy_Bounds(enemy_id),
+												 Weapon_Data, Weapon_Bounds(id))) {
+				continue;}
+			Enemy_TakeHit(enemy_id, Weapon_Data, damage_index, source_x, source_y);
+			if (!Weapon_Pierce(id)) {
+				Weapon_Destroy(object);
+				return;}}}
+
+	if (Debug_Boxes) {
+		Box_Draw(Weapon_Data, Weapon_Bounds(id), 7, 23, OP_OPAQUE);}}

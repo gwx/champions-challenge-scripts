@@ -5,4 +5,9 @@ void Combo_Slash(int location) {
 	int ct = Screen->ComboT[location];
 	if (CT_BUSHNEXT == ct
 			|| CT_TALLGRASSNEXT == ct) {
-		++Screen->ComboD[location];}}
+		++Screen->ComboD[location];
+		if (Rand(100) < 10) {
+			item o = Item_Create(I_HEART);
+			o->X = ComboX(location);
+			o->Y = ComboY(location);
+			o->Pickup = IP_TIMEOUT;}}}

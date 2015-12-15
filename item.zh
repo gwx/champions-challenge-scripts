@@ -1,0 +1,114 @@
+////////////////////////////////////////////////////////////////
+// Item->Misc Indices
+
+const int ITEM_MISC_ID = 0;
+const int ITEM_MISC_PICKUP_AGE = 1;
+
+////////////////////////////////////////////////////////////////
+// Item Accessors.
+
+// Get the item's id.
+int Item_Id(item o) {
+	return o->Misc[ITEM_MISC_ID] - 1;}
+
+// Set the item's id.
+void Item_Id(item o, int id) {
+	o->Misc[ITEM_MISC_ID] = id + 1;}
+
+////////////////////////////////////////////////////////////////
+// Allocation
+
+const int ITEM_MAX = 255;
+
+item Item_Create(int type) {
+	bool id_free;
+	int id;
+	int other_id;
+	int index;
+	item o;
+	item other_o;
+
+	o = Screen->CreateItem(type);
+
+	// Find an unused id.
+	id = G[Item_LastId];
+	for (id = (id + 1) % ITEM_MAX;
+			 id != G[Item_LastId];
+			 id = (id + 1) % ITEM_MAX) {
+		// Check all existing items for an id overlap. Since we're keeping track
+		// of the starting id, this should only be run through once most of the
+		// time.
+		id_free = true;
+		for (index = 1; index <= Screen->NumItems(); ++index) {
+			other_o = Screen->LoadItem(index);
+			other_id = Item_Id(other_o);
+			if (id == other_id) {
+				id_free = false;
+				break;}}
+		if (id_free) {break;}}
+
+	// If we couldn't find an unused id, cancel.
+	if (G[Item_LastId] == id) {
+		R[0] = -1;
+		return o;}
+
+	// Set the id.
+	Item_Id(o, id);
+	R[0] = id;
+
+	return o;}
+
+////////////////////////////////////////////////////////////////
+// Lookup
+
+// Holds the last seen screen index for all items.
+int Item_LastScreenIndex[255];
+
+// Get the screen index of the item with the given id. If there is none,
+// return 0.
+int Item_ScreenIndex(int id) {
+	int index;
+	int actual_id;
+	item o;
+
+	// First, try the saved screen index.
+	index = Item_LastScreenIndex[id];
+	if (1 <= index && index <= Screen->NumItems()) {
+		o = Screen->LoadItem(index);
+		// Check to make sure it actually is the one we want.
+		actual_id = Item_Id(o);
+		if (actual_id == id) {
+			return index;}
+		// If it's not the one we want, update the index we just learned about.
+		else {
+			Item_LastScreenIndex[id] = 0;}}
+
+	// We don't know where it is, so loop through on-screen objects until we
+	// find it.
+	for (index = 1; index <= Screen->NumItems(); ++index) {
+		// Grab the id.
+		o = Screen->LoadItem(index);
+		actual_id = Item_Id(o);
+		// Update the indices.
+		Item_LastScreenIndex[actual_id] = index;
+		// If it's correct, return the index.
+		if (actual_id == id) {return index;}}
+
+	// We couldn't find the item.
+	return 0;}
+
+////////////////////////////////////////////////////////////////
+// Active Script Calls
+
+void Item_Update() {
+	for (int index = 1; index <= Screen->NumItems(); ++index) {
+		item o = Screen->LoadItem(index);
+		if (o->Pickup & IP_TIMEOUT) {
+			++o->Misc[ITEM_MISC_PICKUP_AGE];}}}
+
+////////////////////////////////////////////////////////////////
+// Use
+
+bool Item_CanPickup(item o) {
+	return (o->Pickup & IP_TIMEOUT)
+		&& o->Misc[ITEM_MISC_PICKUP_AGE] >= 30;}
