@@ -430,7 +430,8 @@ int Enemy_Walk(int id, int x, int y) {
 	Enemy_Center(id);
 	int end_x = R[0];
 	int end_y = R[1];
-	Enemy_Dir(id, Dir_Major(end_x - start_x, end_y - start_y));
+	int enemy_dir = Enemy_Dir(id);
+	Enemy_Dir(id, Dir_Coerce(enemy_dir, end_x - start_x, end_y - start_y));
 
 	return distance;}
 
@@ -452,7 +453,7 @@ int Enemy_WalkSmart(int id, int x, int y) {
 	Enemy_Center(id);
 	int end_x = R[0];
 	int end_y = R[1];
-	Enemy_Dir(id, Dir_Major(end_x - start_x, end_y - start_y));
+	Enemy_Dir(id, Dir_Coerce(Enemy_Dir(dir), end_x - start_x, end_y - start_y));
 
 	return distance;}
 

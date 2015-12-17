@@ -50,6 +50,13 @@ int Dir_Minor(int dx, int dy) {
 		if (dy > 0) {return DIR_DOWN;}
 		else {return DIR_UP;}}}
 
+// If dir is too far outside of the facing, return that facing directly.
+int Dir_Coerce(int dir, int dx, int dy) {
+	int major = Dir_Major(dx, dy);
+	if (major == dir) {return dir;}
+	if (Abs(WrapDegrees(Angle(dx, dy) - Dir_Angle(dir))) >= 90) {return major;}
+	return dir;}
+
 // Get the next cardinal clockwise direction.
 int Dir_ClockwiseCardinal(int dir) {
 	if (dir == DIR_UP) {return DIR_RIGHT;}

@@ -64,8 +64,7 @@ ffc script enemy_spear {
 
 		// Give detection.
 		Enemy_Sight(enemy_id, 150);
-		Enemy_Scent(enemy_id, 500);
-		//Enemy_Scent(enemy_id, 72);
+		Enemy_Scent(enemy_id, 48);
 		// Initial detection.
 		Enemy_SenseLink(enemy_id);
 
