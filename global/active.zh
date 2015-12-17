@@ -9,6 +9,7 @@ global script active {
 			Enemy_Detect();
 
       // Update Section.
+			Path_Update();
 			Item_Update();
 			Link_Update();
 			Enemy_Update();

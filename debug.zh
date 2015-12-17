@@ -6,8 +6,12 @@ const int DEBUG_ENEMY = 3;
 
 int Debug_Mode = DEBUG_NONE;
 bool Debug_Boxes = false;
+bool Debug_Path = false;
 
 void Debug_Update() {
+	if (Input_Held & KEYF_EX4 && Input_Pressed & KEYF_EX1) {
+		Debug_Path = !Debug_Path;}
+
 	if (Input_Held & KEYF_EX4 && Input_Pressed & KEYF_EX2) {
 		Debug_Boxes = !Debug_Boxes;}
 

@@ -434,6 +434,28 @@ int Enemy_Walk(int id, int x, int y) {
 
 	return distance;}
 
+// Make the enemy walk towards the given coordinates, using the walk function.
+// id - the enemy id
+// x, y - where the enemy is trying to move its center to
+int Enemy_WalkSmart(int id, int x, int y) {
+	Enemy_Center(id);
+	int start_x = R[0];
+	int start_y = R[1];
+	int dx = x - start_x;
+	int dy = y - start_y;
+	int distance = Min(Enemy_Speed(id), Sqrt(dx*dx + dy*dy));
+	int dir = Dir_Major(dx, dy);
+
+	distance = Terrain_BoxWalk(Enemy_Data, Enemy_Bounds(id), distance,
+														 dir, TERRAIN_WALK | TERRAIN_ONSCREEN);
+
+	Enemy_Center(id);
+	int end_x = R[0];
+	int end_y = R[1];
+	Enemy_Dir(id, Dir_Major(end_x - start_x, end_y - start_y));
+
+	return distance;}
+
 ////////////////////////////////////////////////////////////////
 // Wandering
 

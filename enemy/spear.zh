@@ -40,6 +40,8 @@ const int ENEMY_SPEAR_DURATION_END_DELAY_MAX = 40;
 const int ENEMY_SPEAR_DURATION_PURSUE = 240;
 // Sound for the spear attacking.
 const int ENEMY_SPEAR_ATTACK_SOUND = 30;
+// How long to wait for the path timer to update
+const int ENEMY_SPEAR_DURATION_PATH = 30;
 
 ffc script enemy_spear {
 	void run() {
@@ -62,7 +64,8 @@ ffc script enemy_spear {
 
 		// Give detection.
 		Enemy_Sight(enemy_id, 150);
-		Enemy_Scent(enemy_id, 72);
+		Enemy_Scent(enemy_id, 500);
+		//Enemy_Scent(enemy_id, 72);
 		// Initial detection.
 		Enemy_SenseLink(enemy_id);
 
@@ -72,6 +75,10 @@ ffc script enemy_spear {
 		int walk_timer = 0;
 		// Id of the spear weapon currently out.
 		int weapon_id = -1;
+		// Data array for pathfinding.
+		int path[100];
+		int path_index = 0;
+		int path_timer = -1;
 
 		// Randomize these so they don't clump together as much.
 		int spear_distance = Rand(
@@ -134,14 +141,38 @@ ffc script enemy_spear {
 					int dy = ly - ey;
 					int distance = Sqrt(dx*dx + dy*dy);
 
-					// Move towards last seen space.
+					// Move along path.
 					if (distance > 32) {
-						Enemy_Walk(enemy_id, lx, ly);}
+						// Check for updating the path.
+						--path_timer;
+						bool valid = true;
+						if (path_timer < 0) {
+							valid = Path_Find(Path_Index(ex, ey), Path_Index(lx, ly),
+																TERRAIN_ONSCREEN | TERRAIN_WALK,
+																path);
+							if (valid) {
+								path_timer = ENEMY_SPEAR_DURATION_PATH;
+								path_index = 0;}
+							else {
+								// If we can't find a valid path, lose sight of link.
+								Enemy_LinkTime(enemy_id, -1);
+								Enemy_Wander(enemy_id, wander);}}
+						if (valid) {
+							// Check for needing to advance the path index.
+							while (Abs(ex - Path_X(path[path_index])) + Abs(ey - Path_Y(path[path_index])) <= 11) {
+								Trace(Abs(ex - Path_X(path[path_index])) + Abs(ey - Path_Y(path[path_index])));
+								++path_index;}
+							lx = Path_X(path[path_index]);
+							ly = Path_Y(path[path_index]);
+							if (Debug_Path) {Path_Draw(path);}
+							Enemy_WalkSmart(enemy_id, lx, ly);}}
 					// If we're close and haven't seen link, give up.
 					else if (time > 0) {
 						Enemy_LinkTime(enemy_id, -1);}
 					// Move into alignment.
 					else if (Min(Abs(dx), Abs(dy)) > ENEMY_SPEAR_ALIGN_DISTANCE) {
+						// Invalidate old path.
+						path_timer = -1;
 						// Give a tiny bit of movement towards the target, but mostly
 						// moving towards alignment.
 						int x = lx;

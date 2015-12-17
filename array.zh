@@ -26,3 +26,27 @@ void Array_Add(int target, int target_start, int source, int source_start, int c
 void Array_Subtract(int target, int target_start, int source, int source_start, int count) {
 	for (int i = 0; i < count; ++i) {
 		target[i + target_start] -= source[i + source_start];}}
+
+// Insert a value into an array
+// array - the array
+// index - the index to insert at
+// value - the value to insert
+// null - the value to consider "empty", so we can stop shifting.
+void Array_Insert(int array, int index, int value, int null) {
+	int i = index;
+	while (array[i] != null) {++i;}
+	while (i > index) {
+		array[i] = array[i - 1];
+		--i;}
+	array[index] = value;}
+
+// Remove a value from an array, shifting everything after down.
+// array - the array to shift
+// value - the value to remove
+// null - the value to consider "empty", so we can stop shifting.
+void Array_Remove(int array, int value, int null) {
+	int index = 0;
+	while (value != array[index]) {++index;}
+	while (array[index] != null) {
+		array[index] = array[index + 1];
+		++index;}}

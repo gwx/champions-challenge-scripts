@@ -52,6 +52,10 @@ const int Link_TileBase         = 100;
 const int Link_TileOffset       = 101;
 const int Link_TileMods         = 102;
 
+// path.zh
+
+const int Path_Valid = 150;
+
 // screen.zh
 
 const int Screen_Previous = 200;
