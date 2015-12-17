@@ -11,57 +11,57 @@ const int PATH_TERRAIN = 0;
 
 // Get the path index for a given coordinate.
 int Path_Index(int x, int y) {
-	x = Clamp(Round(x * 0.125) - 1, 0, PATH_WIDTH);
-	y = Clamp(Round(y * 0.125) - 1, 0, PATH_HEIGHT);
-	return y * PATH_WIDTH + x;}
+  x = Clamp(Round(x * 0.125) - 1, 0, PATH_WIDTH);
+  y = Clamp(Round(y * 0.125) - 1, 0, PATH_HEIGHT);
+  return y * PATH_WIDTH + x;}
 
 // Get the neighboring index, or -1.
 int Path_Neighbor(int index, int dir) {
-	if (DIR_UP == dir) {
-		if (index < PATH_WIDTH) {return -1;}
-		return index - PATH_WIDTH;}
-	if (DIR_DOWN == dir) {
-		index += PATH_WIDTH;
-		if (index >= 651) {return -1;}
-		return index;}
-	if (DIR_LEFT == dir) {
-		if (0 == index % PATH_WIDTH) {return -1;}
-		return index - 1;}
-	if (DIR_RIGHT == dir) {
-		if (PATH_WIDTH - 1 == index % PATH_WIDTH) {return -1;}
-		return index + 1;}}
+  if (DIR_UP == dir) {
+    if (index < PATH_WIDTH) {return -1;}
+    return index - PATH_WIDTH;}
+  if (DIR_DOWN == dir) {
+    index += PATH_WIDTH;
+    if (index >= 651) {return -1;}
+    return index;}
+  if (DIR_LEFT == dir) {
+    if (0 == index % PATH_WIDTH) {return -1;}
+    return index - 1;}
+  if (DIR_RIGHT == dir) {
+    if (PATH_WIDTH - 1 == index % PATH_WIDTH) {return -1;}
+    return index + 1;}}
 
 // Get the x location of a path index.
 int Path_X(int index) {
-	return (index % PATH_WIDTH) * 8 + 8;}
+  return (index % PATH_WIDTH) * 8 + 8;}
 
 // Get the y location of a path index.
 int Path_Y(int index) {
-	return Floor(index / PATH_WIDTH) * 8 + 8;}
+  return Floor(index / PATH_WIDTH) * 8 + 8;}
 
 void Path_Update() {
-	if (G[Screen_Changed]) {G[Path_Valid] = 0;}}
+  if (G[Screen_Changed]) {G[Path_Valid] = 0;}}
 
 void Path_EnsureValid() {
-	int i;
-	int x;
-	int y;
+  int i;
+  int x;
+  int y;
 
-	if (!G[Path_Valid]) {
-		for (i = 0; i < PATH_WIDTH * PATH_HEIGHT; ++i) {
-			x = i % PATH_WIDTH * 8;
-			y = Floor(i / PATH_WIDTH) * 8;
-			int terrain = TERRAIN_ALL;
-			terrain &= Terrain_Location(x, y);
-			terrain &= Terrain_Location(x + 8, y);
-			terrain &= Terrain_Location(x, y + 8);
-			terrain &= Terrain_Location(x + 8, y + 8);
-			Path_Data[i * PATH_DATA_SIZE + PATH_TERRAIN] = terrain;}
-		G[Path_Valid] = 1;}}
+  if (!G[Path_Valid]) {
+    for (i = 0; i < PATH_WIDTH * PATH_HEIGHT; ++i) {
+      x = i % PATH_WIDTH * 8;
+      y = Floor(i / PATH_WIDTH) * 8;
+      int terrain = TERRAIN_ALL;
+      terrain &= Terrain_Location(x, y);
+      terrain &= Terrain_Location(x + 8, y);
+      terrain &= Terrain_Location(x, y + 8);
+      terrain &= Terrain_Location(x + 8, y + 8);
+      Path_Data[i * PATH_DATA_SIZE + PATH_TERRAIN] = terrain;}
+    G[Path_Valid] = 1;}}
 
 // Get the H cost between two points.
 int Path_H(int start, int end) {
-	return Abs(Path_X(start) - Path_X(end)) + Abs(Path_Y(start) - Path_Y(end));}
+  return Abs(Path_X(start) - Path_X(end)) + Abs(Path_Y(start) - Path_Y(end));}
 
 // Find a path between two points.
 // start - the starting path index
@@ -73,92 +73,86 @@ const int PATH_FIND_UNDISCOVERED = 0;
 const int PATH_FIND_OPEN = 1;
 const int PATH_FIND_CLOSED = 2;
 bool Path_Find(int start, int end, int terrain, int path) {
-	Path_EnsureValid();
-	int i;
-	int g[651];
-	int f[651];
-	int source[651];
-	int state[651];
-	int queue[651];
-	int test_g;
+  Path_EnsureValid();
+  int i;
+  int g[651];
+  int f[651];
+  int source[651];
+  int state[651];
+  int queue[651];
+  int test_g;
 
-	g[start] = 1;
-	f[start] = 1 + Path_H(start, end);
-	source[start] = -1;
+  g[start] = 1;
+  f[start] = 1 + Path_H(start, end);
+  source[start] = -1;
 
-	int index = start;
+  int index = start;
 
-	while (true) {
-		// Check to see if we've reached.
-		if (end == index) {
-			// Fill path array.
-			for (i = 0; i < SizeOfArray(path) && index != start; ++i) {
-				path[i] = index;
-				index = source[index];}
-			// Cap it.
-			path[i] = -1;
-			// Reverse the contents.
-			int length = i - 1;
-			int times = Ceiling(i / 2);
-			for (i = 0; i <= times; ++i) {
-				int temp = path[i];
-				path[i] = path[length - i];
-				path[length - i] = temp;}
-			return true;}
+  while (true) {
+    // Check to see if we've reached.
+    if (end == index) {
+      // Fill path array.
+      for (i = 0; i < SizeOfArray(path) && index != start; ++i) {
+        path[i] = index;
+        index = source[index];}
+      // Cap it.
+      path[i] = -1;
+      // Reverse the contents.
+      int length = i - 1;
+      int times = Ceiling(i / 2);
+      for (i = 0; i <= times; ++i) {
+        int temp = path[i];
+        path[i] = path[length - i];
+        path[length - i] = temp;}
+      return true;}
 
-		state[index] = PATH_FIND_CLOSED;
+    state[index] = PATH_FIND_CLOSED;
 
-		// Add the neighbors of index if they're valid.
-		for (int dir = 0; dir < 4; ++dir) {
-			int neighbor = Path_Neighbor(index, dir);
-			if (-1 == neighbor) {continue;}
-			// Check for already being evaluated.
-			if (PATH_FIND_CLOSED == state[neighbor]) {continue;}
-			// Check for being invalid terrain.
-			if (terrain != (Path_Data[index * PATH_DATA_SIZE + PATH_TERRAIN] & terrain)) {continue;}
+    // Add the neighbors of index if they're valid.
+    for (int dir = 0; dir < 4; ++dir) {
+      int neighbor = Path_Neighbor(index, dir);
+      if (-1 == neighbor) {continue;}
+      // Check for already being evaluated.
+      if (PATH_FIND_CLOSED == state[neighbor]) {continue;}
+      // Check for being invalid terrain.
+      if (terrain != (Path_Data[index * PATH_DATA_SIZE + PATH_TERRAIN] & terrain)) {continue;}
 
-			test_g = g[index] + 1;
+      test_g = g[index] + 1;
 
-			// Check for it being in the queue
-			if (PATH_FIND_OPEN == state[neighbor]) {
-				// Check for being closer.
-				if (test_g > g[neighbor]) {continue;}
-				// Remove old spot in queue.
-				Array_Remove(queue, neighbor, 0);}
-			// Mark as being found.
-			else {
-				state[neighbor] = PATH_FIND_OPEN;}
+      // Check for it being in the queue
+      if (PATH_FIND_OPEN == state[neighbor]) {
+        // Check for being closer.
+        if (test_g > g[neighbor]) {continue;}
+        // Remove old spot in queue.
+        Array_Remove(queue, neighbor, 0);}
+      // Mark as being found.
+      else {
+        state[neighbor] = PATH_FIND_OPEN;}
 
-			// Update neighbor's data.
-			g[neighbor] = test_g;
-			source[neighbor] = index;
-			f[neighbor] = g[neighbor] + Path_H(neighbor, end);
+      // Update neighbor's data.
+      g[neighbor] = test_g;
+      source[neighbor] = index;
+      f[neighbor] = g[neighbor] + Path_H(neighbor, end);
 
-			// Add neighbor to queue.
-			for (i = 0; 0 != queue[i]; ++i) {
-				if (f[neighbor] < f[queue[i]]) {break;}}
-			Array_Insert(queue, i, neighbor, 0);}
+      // Add neighbor to queue.
+      for (i = 0; 0 != queue[i]; ++i) {
+        if (f[neighbor] < f[queue[i]]) {break;}}
+      Array_Insert(queue, i, neighbor, 0);}
 
-		// Check for queue being empty.
-		if (!queue[0]) {
-			for (int i= 0; i < 651; ++i) {
-				int x = Path_X(i);
-				int y = Path_Y(i);
-				Screen->Rectangle(7,
-												x - 4, y - 4, x + 3, y + 3,
-													32 + state[i], 1, 0, 0, 0, true, OP_TRANS);}
-			return false;}
+    // Check for queue being empty.
+    if (!queue[0]) {
+      return false;}
 
-		// Grab first element.
-		index = queue[0];
-		// Shift rest of array.
-		Array_Remove(queue, index, 0);}}
+    // Grab first element.
+    index = queue[0];
+    // Shift rest of array.
+    Array_Remove(queue, index, 0);}}
 
 // Draw a path.
 void Path_Draw(int path) {
-	for (int i = 0; -1 != path[i]; ++i) {
-		int x = Path_X(path[i]);
-		int y = Path_Y(path[i]);
-		Screen->Rectangle(7,
-											x - 4, y - 4, x + 3, y + 3,
-											32, 1, 0, 0, 0, true, OP_TRANS);}}
+  for (int i = 0; -1 != path[i]; ++i) {
+    int x = Path_X(path[i]);
+    int y = Path_Y(path[i]);
+    Screen->Rectangle(7,
+                      x - 4, y - 4, x + 3, y + 3,
+                      32, 1, 0, 0, 0, true, OP_TRANS);}}
